@@ -30,9 +30,9 @@ Next you should create a layout file container a something similar to this:
 
 In your activity/fragment you should do somthing like this:
 ```java
-mFlipView = (FlipView) findViewById(R.id.flip_view);
+FlipView flipView = (FlipView) findViewById(R.id.flip_view);
 MyAdapter adapter = new MyAdapter();
-mFlipView.setAdapter(adapter);
+flipView.setAdapter(adapter);
 ```
 
 ```MyAdapter```in this case is just a normal adapter, nothing different from on you would use with a ```ListView```.
