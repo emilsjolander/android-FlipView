@@ -8,7 +8,7 @@ This library is made to be very easy to use and at the same time be feature comp
 With only a few lines of code you can have a flipping animation between your views, 
 this looks and acts very much like the Flipboard application (I am however not affiliated with them in any way).
 
-All flipping animations should be very smooth and i have added lighting effects so the flipping looks more realistic.
+All flipping animations should be very smooth and i have added lighting effects so the flipping look more realistic.
 
 Honeycomb (sdk 11) or above is required for this library to work properly, however it will compile (and run, though without good performance) for much lower versions with just a few tweaks.
 
@@ -74,7 +74,7 @@ I feel it would be wrong to change the orientation dynamically so i have limited
 boolean isFlippingVertically();
 ```
 
-This is how to set a listener of the ```FlipView``` to recieve callbacks.
+This is how to set a listener on the ```FlipView``` to recieve callbacks.
 ```java
 void setOnFlipListener(OnFlipListener onFlipListener);
 ```
