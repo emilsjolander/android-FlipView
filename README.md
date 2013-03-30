@@ -12,6 +12,9 @@ All flipping animations should be very smooth and i have added lighting effects 
 
 Honeycomb (sdk 11) or above is required for this library to work properly, however it will compile (and run, though without good performance) for much lower versions with just a few tweaks.
 
+Download a compiled version of the apk here:
+https://www.dropbox.com/s/y4pukhdr3a3ugj8/FlipViewSample.apk
+
 
 Usage
 -----
