@@ -893,11 +893,17 @@ public class FlipView extends FrameLayout {
 	}
 	
 	public void flipTo(int page){
+		if(page < 0 || page > mPageCount-1){
+			throw new IllegalArgumentException("That page does not exist");
+		}
 		mFlipDistance = page*FLIP_DISTANCE_PER_PAGE;
 		invalidate();
 	}
-	
+
 	public void smoothFlipTo(int page){
+		if(page < 0 || page > mPageCount-1){
+			throw new IllegalArgumentException("That page does not exist");
+		}
 		final int start = (int) mFlipDistance;
 		final int delta = page*FLIP_DISTANCE_PER_PAGE - start;
 
