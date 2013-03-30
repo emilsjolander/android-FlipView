@@ -49,7 +49,7 @@ I feel it would be wrong to change the orientation dynamically so i have limited
 boolean isFlippingVertically();
 ```
 
-This is how to set a listener of the ```FlipView``` to recieve callbacks.
+This is how to set a listener on the ```FlipView``` to recieve callbacks.
 ```java
 void setOnFlipListener(OnFlipListener onFlipListener);
 ```
