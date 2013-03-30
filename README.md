@@ -13,6 +13,31 @@ All flipping animations should be very smooth and i have added lighting effects 
 Honeycomb (sdk 11) or above is required for this library to work properly, however it will compile (and run, though without good performance) for much lower versions with just a few tweaks.
 
 
+Usage
+-----
+
+First thing you have to do is download the library and add it as a library project to your project.
+
+Next you should create a layout file container a something similar to this:
+```xml
+<se.emilsjolander.flipview.FlipView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:flipview="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/flip_view"
+    flipview:orientation="vertical" />
+```
+
+In your activity/fragment you should do somthing like this:
+```java
+mFlipView = (FlipView) findViewById(R.id.flip_view);
+MyAdapter adapter = new MyAdapter();
+mFlipView.setAdapter(adapter);
+```
+
+```MyAdapter```in this case is just a normal adapter, nothing different from on you would use with a ```ListView```.
+
+
 Api
 ---
 
