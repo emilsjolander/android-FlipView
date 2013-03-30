@@ -1,0 +1,14 @@
+# OS
+.DS_Store
+
+# eclipse
+.classpath
+.project
+.settings
+
+#android
+bin
+gen
+*.apk
+*.ap_
+*.dex

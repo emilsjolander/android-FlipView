@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">FlipViewSample</string>
+    <string name="first">First</string>
+    <string name="last">Last</string>
+
+</resources>
