@@ -34,7 +34,7 @@ public class MainActivity extends Activity implements Callback, OnFlipListener {
 	public void onFlippedToPage(FlipView v, int position, long id) {
 		Toast.makeText(getBaseContext(), "Page: "+position, Toast.LENGTH_SHORT).show();
 		if(position > mFlipView.getPageCount()-3 && mFlipView.getPageCount()<30){
-			//mAdapter.addItems(5);
+			mAdapter.addItems(5);
 		}
 	}
 
