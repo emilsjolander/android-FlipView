@@ -313,7 +313,7 @@ public class FlipView extends FrameLayout {
             mLastX = MotionEventCompat.getX(ev, mActivePointerId);
             mLastY = MotionEventCompat.getY(ev, mActivePointerId);
 
-            mIsFlipping = !mScroller.isFinished();
+            mIsFlipping = !mScroller.isFinished() | mPeakAnim != null;
             mIsUnableToFlip = false;
         	mLastTouchAllowed = true;
         	
