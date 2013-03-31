@@ -20,6 +20,7 @@ import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
+import android.support.v4.widget.EdgeEffectCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
@@ -120,6 +121,10 @@ public class FlipView extends FrameLayout {
 	private Paint mShadePaint = new Paint();
 	private Paint mShinePaint = new Paint();
 	
+	//edge glow effects
+	private EdgeEffectCompat mPreviousEdgeEffect;
+	private EdgeEffectCompat mNextEdgeEffect;
+	
 	public FlipView(Context context) {
 		this(context, null);
 	}
@@ -155,6 +160,9 @@ public class FlipView extends FrameLayout {
         mShadePaint.setStyle(Style.FILL);
         mShinePaint.setColor(Color.WHITE);
         mShinePaint.setStyle(Style.FILL);
+        
+        mPreviousEdgeEffect = new EdgeEffectCompat(context);
+        mNextEdgeEffect = new EdgeEffectCompat(context);
 	}
 	
 	private void dataSetChanged() {
@@ -396,7 +404,12 @@ public class FlipView extends FrameLayout {
                 deltaFlipDistance /= (getHeight()/FLIP_DISTANCE_PER_PAGE);
                 mFlipDistance += deltaFlipDistance;
                 
-                bindFlipDistance();
+                float distanceBound = bindFlipDistance();
+                if(distanceBound > 0){
+                    mNextEdgeEffect.onPull(distanceBound/(isFlippingVertically()?getHeight():getWidth()));
+                }else if(distanceBound < 0){
+                    mPreviousEdgeEffect.onPull(-distanceBound/(isFlippingVertically()?getHeight():getWidth()));
+                }
                 invalidate();
             }
             break;
@@ -416,6 +429,9 @@ public class FlipView extends FrameLayout {
 
                 mActivePointerId = INVALID_POINTER;
                 endFlip();
+                
+                mNextEdgeEffect.onRelease();
+                mPreviousEdgeEffect.onRelease();
             }
             break;
         case MotionEventCompat.ACTION_POINTER_DOWN: {
@@ -449,8 +465,11 @@ public class FlipView extends FrameLayout {
 			return;
 		}
 		
+		boolean needsInvalidate = false;
+		
 		if(!mScroller.isFinished() && mScroller.computeScrollOffset()){
 			mFlipDistance = mScroller.getCurrY();
+			needsInvalidate = true;
 		}
 		
 		if(mIsFlipping || !mScroller.isFinished() || mPeakAnim != null){
@@ -459,6 +478,7 @@ public class FlipView extends FrameLayout {
 			drawFlippingHalf(canvas);
 		}
 		else{
+			endScroll();
 			final int currentPage = getCurrentPageFloor();
 			if(mCurrentPage != currentPage){
 				postRemoveView(getChildAt(0));
@@ -473,14 +493,54 @@ public class FlipView extends FrameLayout {
 			v.draw(canvas);
 		}
 		
-		if(mScroller.isFinished()){
-			if(!mIsFlipping && mPeakAnim == null){
-				endScroll();
-			}
-		}
-		else {
+		needsInvalidate |= drawEdgeEffects(canvas);
+		
+		if(needsInvalidate) {
 			invalidate();
 		}
+	}
+
+	private boolean drawEdgeEffects(Canvas canvas) {
+		return drawPreviousEdgeEffect(canvas) | drawNextEdgeEffect(canvas);
+	}
+
+	private boolean drawNextEdgeEffect(Canvas canvas) {
+		boolean needsMoreDrawing = false;
+		if(!mNextEdgeEffect.isFinished()){
+			canvas.save();
+			if(isFlippingVertically()){
+				mNextEdgeEffect.setSize(getWidth(), getHeight());
+				canvas.rotate(180);
+				canvas.translate(-getWidth(), -getHeight());
+			}
+			else{
+				mNextEdgeEffect.setSize(getHeight(), getWidth());
+				canvas.rotate(90);
+				canvas.translate(0, -getWidth());
+			}
+			needsMoreDrawing = mNextEdgeEffect.draw(canvas);
+			canvas.restore();
+		}
+		return needsMoreDrawing;
+	}
+
+	private boolean drawPreviousEdgeEffect(Canvas canvas) {
+		boolean needsMoreDrawing = false;
+		if(!mPreviousEdgeEffect.isFinished()){
+			canvas.save();
+			if(isFlippingVertically()){
+				mPreviousEdgeEffect.setSize(getWidth(), getHeight());
+				canvas.rotate(0);
+			}
+			else{
+				mPreviousEdgeEffect.setSize(getHeight(), getWidth());
+				canvas.rotate(270);
+				canvas.translate(-getHeight(), 0);
+			}
+			needsMoreDrawing = mPreviousEdgeEffect.draw(canvas);
+			canvas.restore();
+		}
+		return needsMoreDrawing;
 	}
 
 	/**
@@ -705,15 +765,17 @@ public class FlipView extends FrameLayout {
 		});
 	}
 
-	private void bindFlipDistance(){
+	private float bindFlipDistance(){
 		final int minFlipDistance = 0;
 		final int maxFlipDistance = (mPageCount-1)*FLIP_DISTANCE_PER_PAGE;
+		final float flipDistanceBeforeBinding = mFlipDistance;
 		if(mFlipDistance < minFlipDistance){
         	mFlipDistance = 0;
         }
         else if(mFlipDistance > maxFlipDistance){
         	mFlipDistance = maxFlipDistance;
         }
+		return flipDistanceBeforeBinding - mFlipDistance;
 	}
 	
 	private void onSecondaryPointerUp(MotionEvent ev) {
