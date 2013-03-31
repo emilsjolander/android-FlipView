@@ -17,6 +17,7 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 	
 	private LayoutInflater inflater;
 	private Callback callback;
+	private int count = 10;
 	
 	public FlipAdapter(Context context) {
 		inflater = LayoutInflater.from(context);
@@ -28,7 +29,7 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 
 	@Override
 	public int getCount() {
-		return 10;
+		return count ;
 	}
 
 	@Override
@@ -62,7 +63,7 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 		}
 		
 		holder.text.setText(""+position);
-		convertView.setBackgroundColor(getColor(position));
+		//convertView.setBackgroundColor(getColor(position));
 		
 		return convertView;
 	}
@@ -92,6 +93,11 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 			}
 			break;
 		}
+	}
+
+	public void addItems(int amount) {
+		count += amount;
+		notifyDataSetChanged();
 	}
 
 }

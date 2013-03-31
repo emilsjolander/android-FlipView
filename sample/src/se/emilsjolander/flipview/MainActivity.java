@@ -6,9 +6,10 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.widget.Toast;
 
-public class MainActivity extends Activity implements Callback {
+public class MainActivity extends Activity implements Callback, OnFlipListener {
 	
 	private FlipView mFlipView;
+	private FlipAdapter mAdapter;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -16,16 +17,10 @@ public class MainActivity extends Activity implements Callback {
 		setContentView(R.layout.activity_main);
 		
 		mFlipView = (FlipView) findViewById(R.id.flip_view);
-		FlipAdapter adapter = new FlipAdapter(this);
-		adapter.setCallback(this);
-		mFlipView.setAdapter(adapter);
-		mFlipView.setOnFlipListener(new OnFlipListener() {
-			
-			@Override
-			public void onFlippedToPage(FlipView v, int position, long id) {
-				Toast.makeText(getBaseContext(), "Page: "+position, Toast.LENGTH_SHORT).show();
-			}
-		});
+		mAdapter = new FlipAdapter(this);
+		mAdapter.setCallback(this);
+		mFlipView.setAdapter(mAdapter);
+		mFlipView.setOnFlipListener(this);
 		
 		mFlipView.peakNext(false);
 	}
@@ -33,6 +28,14 @@ public class MainActivity extends Activity implements Callback {
 	@Override
 	public void onPageRequested(int page) {
 		mFlipView.smoothFlipTo(page);
+	}
+
+	@Override
+	public void onFlippedToPage(FlipView v, int position, long id) {
+		Toast.makeText(getBaseContext(), "Page: "+position, Toast.LENGTH_SHORT).show();
+		if(position > mFlipView.getPageCount()-3){
+			mAdapter.addItems(5);
+		}
 	}
 
 }
