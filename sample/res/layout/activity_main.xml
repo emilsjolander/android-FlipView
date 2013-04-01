@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity" 
     android:id="@+id/flip_view"
-    flipview:orientation="vertical"
+    flipview:orientation="horizontal"
     android:background="#ffffff">
 
 </se.emilsjolander.flipview.FlipView>
