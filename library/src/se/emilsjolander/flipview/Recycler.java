@@ -43,35 +43,38 @@ public class Recycler {
 	 * @param scrap
 	 *            The view to add
 	 */
+	@TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
 	void addScrapView(View scrap, int position, int viewType) {
 		if (viewTypeCount == 1) {
 			currentScrapViews.put(position, scrap);
 		} else {
 			scrapViews[viewType].put(position, scrap);
 		}
-
-		scrap.setAccessibilityDelegate(null);
+		if (Build.VERSION.SDK_INT >= 14) {
+			scrap.setAccessibilityDelegate(null);
+		}
 	}
 
+	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 	static View retrieveFromScrap(SparseArray<View> scrapViews, int position) {
 		int size = scrapViews.size();
 		if (size > 0) {
 			// See if we still have a view for this position.
-			for (int i = 0; i < size; i++) {
-				View view = scrapViews.get(i);
-				int fromPosition = scrapViews.keyAt(i);
-				if (fromPosition == position) {
-					scrapViews.remove(i);
-					return view;
-				}
+			View result = scrapViews.get(position, null);
+			if (result != null) {
+				scrapViews.remove(position);
+				return result;
 			}
 			int index = size - 1;
-			View r = scrapViews.valueAt(index);
-			scrapViews.removeAt(index);
-			return r;
-		} else {
-			return null;
+			result = scrapViews.valueAt(index);
+			if (Build.VERSION.SDK_INT >= 11) {
+				scrapViews.removeAt(index);
+			} else {
+				scrapViews.remove(scrapViews.keyAt(index));
+			}
+			return result;
 		}
+		return null;
 	}
 
 }
