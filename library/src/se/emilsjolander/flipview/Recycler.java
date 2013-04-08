@@ -1,5 +1,7 @@
 package se.emilsjolander.flipview;
 
+import android.annotation.TargetApi;
+import android.os.Build;
 import android.util.SparseArray;
 import android.view.View;
 
