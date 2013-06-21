@@ -22,6 +22,7 @@ import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
 import android.support.v4.widget.EdgeEffectCompat;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -60,7 +61,7 @@ public class FlipView extends FrameLayout {
 		}
 	}
 
-	private static final float MAX_OVER_FLIP_DISTANCE = 60;// only applies to
+	private static final float MAX_OVER_FLIP_DISTANCE = 70;// only applies to
 															// rubber band
 															// overflip mode
 	private static final int PEAK_ANIM_DURATION = 600;// in ms
@@ -194,19 +195,19 @@ public class FlipView extends FrameLayout {
 
 	private void dataSetChanged() {
 		final int currentPage = mCurrentPage;
-		
+
 		// if the adapter has stable ids, try to keep the page currently on
 		// stable.
 		if (mAdapter.hasStableIds()) {
 			mCurrentPage = getNewPositionOfCurrentPage();
 		}
 		mCurrentPageId = mAdapter.getItemId(mCurrentPage);
-		
+
 		mPageCount = mAdapter.getCount();
 		removeAllViews();
 		mActivePageQueue.clear();
 		mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
-		if(mCurrentPage != currentPage) {
+		if (mCurrentPage != currentPage) {
 			flipTo(mCurrentPage);
 		}
 		addView(viewForPage(mCurrentPage));
@@ -216,19 +217,19 @@ public class FlipView extends FrameLayout {
 		// check if id is on same position, this is because it will
 		// often be that and this way you do not need to iterate the whole
 		// dataset. If it is the same position, you are done.
-		if(mCurrentPageId == mAdapter.getItemId(mCurrentPage)) {
+		if (mCurrentPageId == mAdapter.getItemId(mCurrentPage)) {
 			return mCurrentPage;
 		}
 
 		// iterate the dataset and look for the correct id. If it
 		// exists, set that position as the current position.
-		for(int i = 0 ; i<mAdapter.getCount() ; i++) {
-			if(mCurrentPageId == mAdapter.getItemId(i)) {
+		for (int i = 0; i < mAdapter.getCount(); i++) {
+			if (mCurrentPageId == mAdapter.getItemId(i)) {
 				return i;
 			}
 		}
-		
-		//Id no longer is dataset, keep current page
+
+		// Id no longer is dataset, keep current page
 		return mCurrentPage;
 	}
 
@@ -574,30 +575,33 @@ public class FlipView extends FrameLayout {
 		}
 	}
 
-	private void performOverFlip(float distanceBound) {
+	//perform over flip calculations
+	private void performOverFlip(float deltaOverFlip) {
 		switch (mOverFlipMode) {
 		case GLOW:
-			if (distanceBound > 0) {
-				mNextEdgeEffect.onPull(distanceBound
+			if (deltaOverFlip > 0) {
+				mNextEdgeEffect.onPull(deltaOverFlip
 						/ (isFlippingVertically() ? getHeight() : getWidth()));
-			} else if (distanceBound < 0) {
-				mPreviousEdgeEffect.onPull(-distanceBound
+			} else if (deltaOverFlip < 0) {
+				mPreviousEdgeEffect.onPull(-deltaOverFlip
 						/ (isFlippingVertically() ? getHeight() : getWidth()));
 			}
 			break;
 
 		case RUBBER_BAND:
-			float overFlip = (float) (1 + Math.pow(Math.abs(distanceBound), 0.8));
+			//TODO deltaOverFlip is just a delta value not the full value
+			float overFlip = (float) Math.pow(Math.abs(deltaOverFlip), 1f);//TODO should be .9 or .8
 			overFlip = Math.min(overFlip, MAX_OVER_FLIP_DISTANCE);
-			mFlipDistance += Math.signum(distanceBound) * overFlip;
+			mFlipDistance += Math.signum(deltaOverFlip) * overFlip;
 			break;
 		}
 
 		// notify the listener of an over flip. This is great if wanting to
 		// implement pull-to-refresh
 		if (mOnOverFlipListener != null) {
+			//TODO deltaOverFlip is just a delta value not the full value
 			mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
-					Math.signum(distanceBound) < 0, Math.abs(distanceBound),
+					Math.signum(deltaOverFlip) < 0, Math.abs(deltaOverFlip),
 					FLIP_DISTANCE_PER_PAGE);
 		}
 	}
@@ -650,6 +654,12 @@ public class FlipView extends FrameLayout {
 	 */
 	private void drawPreviousHalf(Canvas canvas) {
 		final View v = viewForPage(getCurrentPageFloor());
+
+		// if the view does not exist, skip drawing it
+		if (v == null) {
+			return;
+		}
+
 		setDrawWithLayer(v, true);
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
@@ -679,6 +689,12 @@ public class FlipView extends FrameLayout {
 	 */
 	private void drawNextHalf(Canvas canvas) {
 		final View v = viewForPage(getCurrentPageCeil());
+
+		// if the view does not exist, skip drawing it
+		if (v == null) {
+			return;
+		}
+
 		setDrawWithLayer(v, true);
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mBottomRect : mRightRect);
@@ -703,10 +719,13 @@ public class FlipView extends FrameLayout {
 
 	private void drawFlippingHalf(Canvas canvas) {
 		final View v = viewForPage(getCurrentPageRound());
+		
 		setDrawWithLayer(v, true);
 		final float degreesFlipped = getDegreesFlipped();
 		canvas.save();
 		mCamera.save();
+		
+		Log.d("debug", "degreesFlipped = "+degreesFlipped);
 
 		if (degreesFlipped > 90) {
 			canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
@@ -780,11 +799,21 @@ public class FlipView extends FrameLayout {
 	}
 
 	private float getDegreesFlipped() {
-		final float localFlipDistance = mFlipDistance % FLIP_DISTANCE_PER_PAGE;
+		float localFlipDistance = mFlipDistance % FLIP_DISTANCE_PER_PAGE;
+		if(localFlipDistance < 0) {
+			localFlipDistance += FLIP_DISTANCE_PER_PAGE;
+		}
 		return (localFlipDistance / FLIP_DISTANCE_PER_PAGE) * 180;
 	}
 
 	private View viewForPage(int page) {
+
+		// if the requested page is outside of the adapters scope, return null.
+		// This should only happen when over flipping with mode RUBBER_BAND
+		if (page < 0 || page >= mPageCount) {
+			return null;
+		}
+
 		final int viewType = mAdapter.getItemViewType(page);
 
 		// check if view needed is in active views, if so order to front and
@@ -927,13 +956,15 @@ public class FlipView extends FrameLayout {
 	 * @return the page you should "land" on
 	 */
 	private int getNextPage(int velocity) {
+		int nextPage;
 		if (velocity > mMinimumVelocity) {
-			return getCurrentPageFloor();
+			nextPage = getCurrentPageFloor();
 		} else if (velocity < -mMinimumVelocity) {
-			return getCurrentPageCeil();
+			nextPage = getCurrentPageCeil();
 		} else {
-			return getCurrentPageRound();
+			nextPage = getCurrentPageRound();
 		}
+		return Math.min(Math.max(nextPage, 0), mPageCount-1);
 	}
 
 	private int getCurrentPageRound() {
