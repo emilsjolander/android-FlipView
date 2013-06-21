@@ -4,6 +4,8 @@ import se.emilsjolander.flipview.FlipAdapter.Callback;
 import se.emilsjolander.flipview.FlipView.OnFlipListener;
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 public class MainActivity extends Activity implements Callback, OnFlipListener {
@@ -23,6 +25,22 @@ public class MainActivity extends Activity implements Callback, OnFlipListener {
 		mFlipView.setOnFlipListener(this);
 		mFlipView.peakNext(false);
 		mFlipView.setOverFlipMode(FlipView.OverFlipMode.RUBBER_BAND);
+	}
+	
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		getMenuInflater().inflate(R.menu.activity_main, menu);
+		return true;
+	}
+	
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		switch (item.getItemId()) {
+		case R.id.prepend:
+			mAdapter.addItemsBefore(5);
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
 	}
 
 	@Override

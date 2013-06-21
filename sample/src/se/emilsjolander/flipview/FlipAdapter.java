@@ -122,4 +122,11 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 		notifyDataSetChanged();
 	}
 
+	public void addItemsBefore(int amount) {
+		for(int i = 0 ; i<amount ; i++){
+			items.add(0, new Item());
+		}
+		notifyDataSetChanged();
+	}
+
 }

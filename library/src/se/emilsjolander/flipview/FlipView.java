@@ -193,6 +193,8 @@ public class FlipView extends FrameLayout {
 	}
 
 	private void dataSetChanged() {
+		final int currentPage = mCurrentPage;
+		
 		// if the adapter has stable ids, try to keep the page currently on
 		// stable.
 		if (mAdapter.hasStableIds()) {
@@ -204,6 +206,9 @@ public class FlipView extends FrameLayout {
 		removeAllViews();
 		mActivePageQueue.clear();
 		mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
+		if(mCurrentPage != currentPage) {
+			flipTo(mCurrentPage);
+		}
 		addView(viewForPage(mCurrentPage));
 	}
 
