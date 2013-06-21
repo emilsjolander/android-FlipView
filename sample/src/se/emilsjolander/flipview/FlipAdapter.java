@@ -1,5 +1,8 @@
 package se.emilsjolander.flipview;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -15,12 +18,29 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 		public void onPageRequested(int page);
 	}
 	
+	static class Item {
+		static long id = 0;
+		
+		long mId;
+		
+		public Item() {
+			mId = id++;
+		}
+		
+		long getId(){
+			return mId;
+		}
+	}
+	
 	private LayoutInflater inflater;
 	private Callback callback;
-	private int count = 10;
+	private List<Item> items = new ArrayList<Item>();
 	
 	public FlipAdapter(Context context) {
 		inflater = LayoutInflater.from(context);
+		for(int i = 0 ; i<10 ; i++){
+			items.add(new Item());
+		}
 	}
 
 	public void setCallback(Callback callback) {
@@ -29,7 +49,7 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 
 	@Override
 	public int getCount() {
-		return count ;
+		return items.size();
 	}
 
 	@Override
@@ -39,7 +59,12 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 
 	@Override
 	public long getItemId(int position) {
-		return position;
+		return items.get(position).getId();
+	}
+	
+	@Override
+	public boolean hasStableIds() {
+		return true;
 	}
 
 	@Override
@@ -62,15 +87,10 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 			holder = (ViewHolder) convertView.getTag();
 		}
 		
-		holder.text.setText(""+position);
-		//convertView.setBackgroundColor(getColor(position));
+		//TODO set a text with the id as well
+		holder.text.setText(items.get(position).getId()+":"+position);
 		
 		return convertView;
-	}
-	
-	private int getColor(int position) {
-		float t = ((float)position)/(getCount()-1);
-		return (int) ((1-t)*0xffff3333 + t*0xff3333ff);
 	}
 
 	static class ViewHolder{
@@ -96,7 +116,9 @@ public class FlipAdapter extends BaseAdapter implements OnClickListener {
 	}
 
 	public void addItems(int amount) {
-		count += amount;
+		for(int i = 0 ; i<amount ; i++){
+			items.add(new Item());
+		}
 		notifyDataSetChanged();
 	}
 

@@ -35,8 +35,18 @@ import android.widget.Scroller;
 
 public class FlipView extends FrameLayout {
 
+	public enum OverFlipMode {
+		GLOW, RUBBER_BAND
+	}
+
 	public interface OnFlipListener {
 		public void onFlippedToPage(FlipView v, int position, long id);
+	}
+
+	public interface OnOverFlipListener {
+		public void onOverFlip(FlipView v, OverFlipMode mode,
+				boolean overFlipTop, float overFlipDistance,
+				float flipDistancePerPage);
 	}
 
 	// wrapper class used when keeping track of active views
@@ -50,6 +60,9 @@ public class FlipView extends FrameLayout {
 		}
 	}
 
+	private static final float MAX_OVER_FLIP_DISTANCE = 60;// only applies to
+															// rubber band
+															// overflip mode
 	private static final int PEAK_ANIM_DURATION = 600;// in ms
 	private static final int MAX_SINGLE_PAGE_FLIP_ANIM_DURATION = 300;// in ms
 	private static final int FLIP_DISTANCE_PER_PAGE = 180; // for normalizing
@@ -58,6 +71,11 @@ public class FlipView extends FrameLayout {
 	private static final int MAX_SHADE_ALPHA = 130;// out of 255
 	private static final int MAX_SHINE_ALPHA = 100;// out of 255
 	private static final int INVALID_POINTER = -1;// value for no pointer
+	private static final int VERTICAL_FLIP = 0;// constant used by the
+												// attributes
+	@SuppressWarnings("unused")
+	private static final int HORIZONTAL_FLIP = 1;// constant used by the
+													// attributes
 
 	private DataSetObserver dataSetObserver = new DataSetObserver() {
 
@@ -98,15 +116,20 @@ public class FlipView extends FrameLayout {
 	// views get recycled after they have been pushed out of the active queue
 	private Recycler mRecycler = new Recycler();
 
-	// holds all views that are currently in use, hold max of 3 views
+	// holds all views that are currently in use, hold max of 3 views as of now
 	private Queue<Page> mActivePageQueue = new LinkedList<FlipView.Page>();
 
 	private ListAdapter mAdapter;
 	private int mPageCount = 0;
+
 	private OnFlipListener mOnFlipListener;
+	private OnOverFlipListener mOnOverFlipListener;
 
 	private float mFlipDistance = 0;
 	private int mCurrentPage = 0;
+	private long mCurrentPageId = 0;
+
+	private OverFlipMode mOverFlipMode = OverFlipMode.GLOW;
 
 	// clipping rects
 	private Rect mTopRect = new Rect();
@@ -142,7 +165,8 @@ public class FlipView extends FrameLayout {
 				R.styleable.FlipView);
 
 		// 0 is vertical, 1 is horizontal
-		mIsFlippingVertically = a.getInt(R.styleable.FlipView_orientation, 0) < 1;
+		mIsFlippingVertically = a.getInt(R.styleable.FlipView_orientation,
+				VERTICAL_FLIP) == VERTICAL_FLIP;
 
 		a.recycle();
 
@@ -169,11 +193,38 @@ public class FlipView extends FrameLayout {
 	}
 
 	private void dataSetChanged() {
+		// if the adapter has stable ids, try to keep the page currently on
+		// stable.
+		if (mAdapter.hasStableIds()) {
+			mCurrentPage = getNewPositionOfCurrentPage();
+		}
+		mCurrentPageId = mAdapter.getItemId(mCurrentPage);
+		
 		mPageCount = mAdapter.getCount();
 		removeAllViews();
 		mActivePageQueue.clear();
 		mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
 		addView(viewForPage(mCurrentPage));
+	}
+
+	private int getNewPositionOfCurrentPage() {
+		// check if id is on same position, this is because it will
+		// often be that and this way you do not need to iterate the whole
+		// dataset. If it is the same position, you are done.
+		if(mCurrentPageId == mAdapter.getItemId(mCurrentPage)) {
+			return mCurrentPage;
+		}
+
+		// iterate the dataset and look for the correct id. If it
+		// exists, set that position as the current position.
+		for(int i = 0 ; i<mAdapter.getCount() ; i++) {
+			if(mCurrentPageId == mAdapter.getItemId(i)) {
+				return i;
+			}
+		}
+		
+		//Id no longer is dataset, keep current page
+		return mCurrentPage;
 	}
 
 	private void dataSetInvalidated() {
@@ -416,14 +467,8 @@ public class FlipView extends FrameLayout {
 				mFlipDistance += deltaFlipDistance;
 
 				float distanceBound = bindFlipDistance();
-				if (distanceBound > 0) {
-					mNextEdgeEffect.onPull(distanceBound
-							/ (isFlippingVertically() ? getHeight()
-									: getWidth()));
-				} else if (distanceBound < 0) {
-					mPreviousEdgeEffect.onPull(-distanceBound
-							/ (isFlippingVertically() ? getHeight()
-									: getWidth()));
+				if (distanceBound != 0) {
+					performOverFlip(distanceBound);
 				}
 				invalidate();
 			}
@@ -505,15 +550,50 @@ public class FlipView extends FrameLayout {
 				postAddView(v);
 				postFlippedToPage(currentPage);
 				mCurrentPage = currentPage;
+				mCurrentPageId = mAdapter.getItemId(mCurrentPage);
 			}
 			setDrawWithLayer(v, false);
 			v.draw(canvas);
 		}
 
-		needsInvalidate |= drawEdgeEffects(canvas);
+		// if overflip is GLOW mode and the edge effects needed drawing, make
+		// sure to invalidate
+		needsInvalidate |= mOverFlipMode == OverFlipMode.GLOW
+				&& drawEdgeEffects(canvas);
 
 		if (needsInvalidate) {
+			// always invalidate whole screen as it is needed 99% of the time.
+			// This is because of the shadows and shines put on the non-flipping
+			// pages
 			invalidate();
+		}
+	}
+
+	private void performOverFlip(float distanceBound) {
+		switch (mOverFlipMode) {
+		case GLOW:
+			if (distanceBound > 0) {
+				mNextEdgeEffect.onPull(distanceBound
+						/ (isFlippingVertically() ? getHeight() : getWidth()));
+			} else if (distanceBound < 0) {
+				mPreviousEdgeEffect.onPull(-distanceBound
+						/ (isFlippingVertically() ? getHeight() : getWidth()));
+			}
+			break;
+
+		case RUBBER_BAND:
+			float overFlip = (float) (1 + Math.pow(Math.abs(distanceBound), 0.8));
+			overFlip = Math.min(overFlip, MAX_OVER_FLIP_DISTANCE);
+			mFlipDistance += Math.signum(distanceBound) * overFlip;
+			break;
+		}
+
+		// notify the listener of an over flip. This is great if wanting to
+		// implement pull-to-refresh
+		if (mOnOverFlipListener != null) {
+			mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
+					Math.signum(distanceBound) < 0, Math.abs(distanceBound),
+					FLIP_DISTANCE_PER_PAGE);
 		}
 	}
 
@@ -784,12 +864,16 @@ public class FlipView extends FrameLayout {
 
 			@Override
 			public void run() {
-				mOnFlipListener.onFlippedToPage(FlipView.this, page,
-						mAdapter.getItemId(page));
+				if (mOnFlipListener != null) {
+					mOnFlipListener.onFlippedToPage(FlipView.this, page,
+							mAdapter.getItemId(page));
+				}
 			}
 		});
 	}
 
+	// binds the flip distance to the first and last page and return how much
+	// flipdistance was cut off. Used for calculating overflip
 	private float bindFlipDistance() {
 		final int minFlipDistance = 0;
 		final int maxFlipDistance = (mPageCount - 1) * FLIP_DISTANCE_PER_PAGE;
@@ -955,6 +1039,7 @@ public class FlipView extends FrameLayout {
 		if (adapter != null) {
 			mAdapter = adapter;
 			mPageCount = mAdapter.getCount();
+			mCurrentPageId = mAdapter.getItemId(mCurrentPage);
 			mAdapter.registerDataSetObserver(dataSetObserver);
 			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
 			addView(viewForPage(mCurrentPage));
@@ -983,6 +1068,10 @@ public class FlipView extends FrameLayout {
 		invalidate();
 	}
 
+	public void flipBy(int delta) {
+		flipTo(mCurrentPage + delta);
+	}
+
 	public void smoothFlipTo(int page) {
 		if (page < 0 || page > mPageCount - 1) {
 			throw new IllegalArgumentException("That page does not exist");
@@ -992,6 +1081,10 @@ public class FlipView extends FrameLayout {
 
 		mScroller.startScroll(0, start, 0, delta, getFlipDuration(delta));
 		invalidate();
+	}
+
+	public void smoothFlipBy(int delta) {
+		smoothFlipTo(mCurrentPage + delta);
 	}
 
 	/**
@@ -1030,8 +1123,42 @@ public class FlipView extends FrameLayout {
 		return mIsFlippingVertically;
 	}
 
+	/**
+	 * The OnFlipListener will notify you when a page has been fully turned.
+	 * 
+	 * @param onFlipListener
+	 */
 	public void setOnFlipListener(OnFlipListener onFlipListener) {
 		mOnFlipListener = onFlipListener;
+	}
+
+	/**
+	 * The OnOverFlipListener will notify of over flipping. This is a great
+	 * listener to have when implementing pull-to-refresh
+	 * 
+	 * @param onOverFlipListener
+	 */
+	public void setOnOverFlipListener(OnOverFlipListener onOverFlipListener) {
+		this.mOnOverFlipListener = onOverFlipListener;
+	}
+
+	/**
+	 * 
+	 * @return the overflip mode of this flipview. Default is GLOW
+	 */
+	public OverFlipMode getOverFlipMode() {
+		return mOverFlipMode;
+	}
+
+	/**
+	 * Set the overflip mode of the flipview. GLOW is the standard seen in all
+	 * andriod lists. RUBBER_BAND is more like iOS lists which list you flip
+	 * past the first/last page but adding friction, like a rubber band.
+	 * 
+	 * @param overFlipMode
+	 */
+	public void setOverFlipMode(OverFlipMode overFlipMode) {
+		this.mOverFlipMode = overFlipMode;
 	}
 
 }
