@@ -8,6 +8,7 @@ public class GlowOverFlipper implements OverFlipper {
 	private EdgeEffectCompat mTopEdgeEffect;
 	private EdgeEffectCompat mBottomEdgeEffect;
 	private FlipView mFlipView;
+	private float mTotalOverFlip;
 	
 	public GlowOverFlipper(FlipView v) {
 		mFlipView = v;
@@ -19,6 +20,8 @@ public class GlowOverFlipper implements OverFlipper {
 	public float calculate(float flipDistance, float minFlipDistance,
 			float maxFlipDistance) {
 		float deltaOverFlip = flipDistance - (flipDistance < 0 ? minFlipDistance : maxFlipDistance);
+		
+		mTotalOverFlip += deltaOverFlip;
 		
 		if (deltaOverFlip > 0) {
 			mBottomEdgeEffect.onPull(deltaOverFlip
@@ -76,6 +79,12 @@ public class GlowOverFlipper implements OverFlipper {
 	public void overFlipEnded() {
 		mTopEdgeEffect.onRelease();
 		mBottomEdgeEffect.onRelease();
+		mTotalOverFlip = 0;
+	}
+
+	@Override
+	public float getTotalOverFlip() {
+		return mTotalOverFlip;
 	}
 
 }

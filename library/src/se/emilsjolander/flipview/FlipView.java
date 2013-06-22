@@ -40,7 +40,7 @@ public class FlipView extends FrameLayout {
 
 	public interface OnOverFlipListener {
 		public void onOverFlip(FlipView v, OverFlipMode mode,
-				boolean overFlipTop, float overFlipDistance,
+				boolean overFlippingPrevious, float overFlipDistance,
 				float flipDistancePerPage);
 	}
 
@@ -54,7 +54,7 @@ public class FlipView extends FrameLayout {
 			this.view = view;
 		}
 	}
-	
+
 	private static final int PEAK_ANIM_DURATION = 600;// in ms
 	private static final int MAX_SINGLE_PAGE_FLIP_ANIM_DURATION = 300;// in ms
 	private static final int FLIP_DISTANCE_PER_PAGE = 180; // for normalizing
@@ -94,6 +94,7 @@ public class FlipView extends FrameLayout {
 	private boolean mIsFlippingEnabled = true;
 	private boolean mLastTouchAllowed = true;
 	private int mTouchSlop;
+	private boolean mIsOverFlipping;
 
 	// keep track of pointer
 	private float mLastX = -1;
@@ -156,8 +157,9 @@ public class FlipView extends FrameLayout {
 		// 0 is vertical, 1 is horizontal
 		mIsFlippingVertically = a.getInt(R.styleable.FlipView_orientation,
 				VERTICAL_FLIP) == VERTICAL_FLIP;
-		
-		setOverFlipMode(OverFlipMode.values()[a.getInt(R.styleable.FlipView_overFlipMode, 0)]);
+
+		setOverFlipMode(OverFlipMode.values()[a.getInt(
+				R.styleable.FlipView_overFlipMode, 0)]);
 
 		a.recycle();
 
@@ -459,14 +461,32 @@ public class FlipView extends FrameLayout {
 						: getWidth()) / FLIP_DISTANCE_PER_PAGE);
 				mFlipDistance += deltaFlipDistance;
 
-
 				final int minFlipDistance = 0;
-				final int maxFlipDistance = (mPageCount - 1) * FLIP_DISTANCE_PER_PAGE;
-				if (mFlipDistance < minFlipDistance || mFlipDistance > maxFlipDistance) {
-					mFlipDistance = mOverFlipper.calculate(mFlipDistance, minFlipDistance, maxFlipDistance);
-					//TODO call mOverFlipListener
+				final int maxFlipDistance = (mPageCount - 1)
+						* FLIP_DISTANCE_PER_PAGE;
+				final boolean isOverFlipping = mFlipDistance < minFlipDistance
+						|| mFlipDistance > maxFlipDistance;
+				if (isOverFlipping) {
+					mIsOverFlipping = true;
+					mFlipDistance = mOverFlipper.calculate(mFlipDistance,
+							minFlipDistance, maxFlipDistance);
+					if (mOnOverFlipListener != null) {
+						float overFlip = mOverFlipper.getTotalOverFlip();
+						mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
+								overFlip < 0, Math.abs(overFlip), FLIP_DISTANCE_PER_PAGE);
+					}
+				} else if (mIsOverFlipping) {
+					mIsOverFlipping = false;
+					if (mOnOverFlipListener != null) {
+						// TODO in the future should only notify flip distance 0
+						// on the correct edge (previous/next)
+						mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
+								false, 0, FLIP_DISTANCE_PER_PAGE);
+						mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
+								true, 0, FLIP_DISTANCE_PER_PAGE);
+					}
 				}
-				
+
 				invalidate();
 			}
 			break;
@@ -571,7 +591,7 @@ public class FlipView extends FrameLayout {
 	 */
 	private void drawPreviousHalf(Canvas canvas) {
 		final View v = viewForPage(getCurrentPageFloor());
-		
+
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
 
@@ -615,7 +635,7 @@ public class FlipView extends FrameLayout {
 			setDrawWithLayer(v, true);
 			v.draw(canvas);
 		}
-		
+
 		drawNextShadow(canvas);
 		canvas.restore();
 	}
@@ -636,7 +656,7 @@ public class FlipView extends FrameLayout {
 
 	private void drawFlippingHalf(Canvas canvas) {
 		final View v = viewForPage(getCurrentPageRound());
-		
+
 		setDrawWithLayer(v, true);
 		final float degreesFlipped = getDegreesFlipped();
 		canvas.save();
@@ -715,12 +735,12 @@ public class FlipView extends FrameLayout {
 
 	private float getDegreesFlipped() {
 		float localFlipDistance = mFlipDistance % FLIP_DISTANCE_PER_PAGE;
-		
-		//fix for negative modulo. always want a positve flip degree
-		if(localFlipDistance < 0) {
+
+		// fix for negative modulo. always want a positve flip degree
+		if (localFlipDistance < 0) {
 			localFlipDistance += FLIP_DISTANCE_PER_PAGE;
 		}
-		
+
 		return (localFlipDistance / FLIP_DISTANCE_PER_PAGE) * 180;
 	}
 
@@ -823,7 +843,7 @@ public class FlipView extends FrameLayout {
 			}
 		});
 	}
-	
+
 	private void onSecondaryPointerUp(MotionEvent ev) {
 		final int pointerIndex = MotionEventCompat.getActionIndex(ev);
 		final int pointerId = MotionEventCompat.getPointerId(ev, pointerIndex);
@@ -868,7 +888,7 @@ public class FlipView extends FrameLayout {
 		} else {
 			nextPage = getCurrentPageRound();
 		}
-		return Math.min(Math.max(nextPage, 0), mPageCount-1);
+		return Math.min(Math.max(nextPage, 0), mPageCount - 1);
 	}
 
 	private int getCurrentPageRound() {

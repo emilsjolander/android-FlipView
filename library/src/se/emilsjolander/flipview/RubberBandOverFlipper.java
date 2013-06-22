@@ -48,4 +48,9 @@ public class RubberBandOverFlipper implements OverFlipper {
 		mCurrentOverFlip = 0;
 	}
 
+	@Override
+	public float getTotalOverFlip() {
+		return mTotalOverFlip;
+	}
+
 }

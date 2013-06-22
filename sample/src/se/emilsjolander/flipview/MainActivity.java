@@ -2,13 +2,15 @@ package se.emilsjolander.flipview;
 
 import se.emilsjolander.flipview.FlipAdapter.Callback;
 import se.emilsjolander.flipview.FlipView.OnFlipListener;
+import se.emilsjolander.flipview.FlipView.OnOverFlipListener;
 import android.app.Activity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-public class MainActivity extends Activity implements Callback, OnFlipListener {
+public class MainActivity extends Activity implements Callback, OnFlipListener, OnOverFlipListener {
 	
 	private FlipView mFlipView;
 	private FlipAdapter mAdapter;
@@ -25,6 +27,8 @@ public class MainActivity extends Activity implements Callback, OnFlipListener {
 		mFlipView.setOnFlipListener(this);
 		mFlipView.peakNext(false);
 		mFlipView.setOverFlipMode(OverFlipMode.RUBBER_BAND);
+		mFlipView.setOnOverFlipListener(this);
+		
 	}
 	
 	@Override
@@ -54,6 +58,13 @@ public class MainActivity extends Activity implements Callback, OnFlipListener {
 		if(position > mFlipView.getPageCount()-3 && mFlipView.getPageCount()<30){
 			mAdapter.addItems(5);
 		}
+	}
+
+	@Override
+	public void onOverFlip(FlipView v, OverFlipMode mode,
+			boolean overFlippingPrevious, float overFlipDistance,
+			float flipDistancePerPage) {
+		Log.i("overflip", "overFlipDistance = "+overFlipDistance);
 	}
 
 }
