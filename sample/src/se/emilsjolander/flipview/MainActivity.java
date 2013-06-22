@@ -24,7 +24,7 @@ public class MainActivity extends Activity implements Callback, OnFlipListener {
 		mFlipView.setAdapter(mAdapter);
 		mFlipView.setOnFlipListener(this);
 		mFlipView.peakNext(false);
-		mFlipView.setOverFlipMode(FlipView.OverFlipMode.RUBBER_BAND);
+		mFlipView.setOverFlipMode(OverFlipMode.RUBBER_BAND);
 	}
 	
 	@Override

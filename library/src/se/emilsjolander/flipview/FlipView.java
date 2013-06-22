@@ -20,9 +20,7 @@ import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
-import android.support.v4.widget.EdgeEffectCompat;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -35,10 +33,6 @@ import android.widget.ListAdapter;
 import android.widget.Scroller;
 
 public class FlipView extends FrameLayout {
-
-	public enum OverFlipMode {
-		GLOW, RUBBER_BAND
-	}
 
 	public interface OnFlipListener {
 		public void onFlippedToPage(FlipView v, int position, long id);
@@ -60,10 +54,7 @@ public class FlipView extends FrameLayout {
 			this.view = view;
 		}
 	}
-
-	private static final float MAX_OVER_FLIP_DISTANCE = 70;// only applies to
-															// rubber band
-															// overflip mode
+	
 	private static final int PEAK_ANIM_DURATION = 600;// in ms
 	private static final int MAX_SINGLE_PAGE_FLIP_ANIM_DURATION = 300;// in ms
 	private static final int FLIP_DISTANCE_PER_PAGE = 180; // for normalizing
@@ -130,7 +121,8 @@ public class FlipView extends FrameLayout {
 	private int mCurrentPage = 0;
 	private long mCurrentPageId = 0;
 
-	private OverFlipMode mOverFlipMode = OverFlipMode.GLOW;
+	private OverFlipMode mOverFlipMode;
+	private OverFlipper mOverFlipper;
 
 	// clipping rects
 	private Rect mTopRect = new Rect();
@@ -146,10 +138,6 @@ public class FlipView extends FrameLayout {
 	private Paint mShadowPaint = new Paint();
 	private Paint mShadePaint = new Paint();
 	private Paint mShinePaint = new Paint();
-
-	// edge glow effects
-	private EdgeEffectCompat mPreviousEdgeEffect;
-	private EdgeEffectCompat mNextEdgeEffect;
 
 	public FlipView(Context context) {
 		this(context, null);
@@ -168,6 +156,8 @@ public class FlipView extends FrameLayout {
 		// 0 is vertical, 1 is horizontal
 		mIsFlippingVertically = a.getInt(R.styleable.FlipView_orientation,
 				VERTICAL_FLIP) == VERTICAL_FLIP;
+		
+		setOverFlipMode(OverFlipMode.values()[a.getInt(R.styleable.FlipView_overFlipMode, 0)]);
 
 		a.recycle();
 
@@ -188,9 +178,6 @@ public class FlipView extends FrameLayout {
 		mShadePaint.setStyle(Style.FILL);
 		mShinePaint.setColor(Color.WHITE);
 		mShinePaint.setStyle(Style.FILL);
-
-		mPreviousEdgeEffect = new EdgeEffectCompat(context);
-		mNextEdgeEffect = new EdgeEffectCompat(context);
 	}
 
 	private void dataSetChanged() {
@@ -472,10 +459,14 @@ public class FlipView extends FrameLayout {
 						: getWidth()) / FLIP_DISTANCE_PER_PAGE);
 				mFlipDistance += deltaFlipDistance;
 
-				float distanceBound = bindFlipDistance();
-				if (distanceBound != 0) {
-					performOverFlip(distanceBound);
+
+				final int minFlipDistance = 0;
+				final int maxFlipDistance = (mPageCount - 1) * FLIP_DISTANCE_PER_PAGE;
+				if (mFlipDistance < minFlipDistance || mFlipDistance > maxFlipDistance) {
+					mFlipDistance = mOverFlipper.calculate(mFlipDistance, minFlipDistance, maxFlipDistance);
+					//TODO call mOverFlipListener
 				}
+				
 				invalidate();
 			}
 			break;
@@ -498,8 +489,7 @@ public class FlipView extends FrameLayout {
 				mActivePointerId = INVALID_POINTER;
 				endFlip();
 
-				mNextEdgeEffect.onRelease();
-				mPreviousEdgeEffect.onRelease();
+				mOverFlipper.overFlipEnded();
 			}
 			break;
 		case MotionEventCompat.ACTION_POINTER_DOWN: {
@@ -564,8 +554,7 @@ public class FlipView extends FrameLayout {
 
 		// if overflip is GLOW mode and the edge effects needed drawing, make
 		// sure to invalidate
-		needsInvalidate |= mOverFlipMode == OverFlipMode.GLOW
-				&& drawEdgeEffects(canvas);
+		needsInvalidate |= mOverFlipper.draw(canvas);
 
 		if (needsInvalidate) {
 			// always invalidate whole screen as it is needed 99% of the time.
@@ -575,78 +564,6 @@ public class FlipView extends FrameLayout {
 		}
 	}
 
-	//perform over flip calculations
-	private void performOverFlip(float deltaOverFlip) {
-		switch (mOverFlipMode) {
-		case GLOW:
-			if (deltaOverFlip > 0) {
-				mNextEdgeEffect.onPull(deltaOverFlip
-						/ (isFlippingVertically() ? getHeight() : getWidth()));
-			} else if (deltaOverFlip < 0) {
-				mPreviousEdgeEffect.onPull(-deltaOverFlip
-						/ (isFlippingVertically() ? getHeight() : getWidth()));
-			}
-			break;
-
-		case RUBBER_BAND:
-			//TODO deltaOverFlip is just a delta value not the full value
-			float overFlip = (float) Math.pow(Math.abs(deltaOverFlip), 1f);//TODO should be .9 or .8
-			overFlip = Math.min(overFlip, MAX_OVER_FLIP_DISTANCE);
-			mFlipDistance += Math.signum(deltaOverFlip) * overFlip;
-			break;
-		}
-
-		// notify the listener of an over flip. This is great if wanting to
-		// implement pull-to-refresh
-		if (mOnOverFlipListener != null) {
-			//TODO deltaOverFlip is just a delta value not the full value
-			mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
-					Math.signum(deltaOverFlip) < 0, Math.abs(deltaOverFlip),
-					FLIP_DISTANCE_PER_PAGE);
-		}
-	}
-
-	private boolean drawEdgeEffects(Canvas canvas) {
-		return drawPreviousEdgeEffect(canvas) | drawNextEdgeEffect(canvas);
-	}
-
-	private boolean drawNextEdgeEffect(Canvas canvas) {
-		boolean needsMoreDrawing = false;
-		if (!mNextEdgeEffect.isFinished()) {
-			canvas.save();
-			if (isFlippingVertically()) {
-				mNextEdgeEffect.setSize(getWidth(), getHeight());
-				canvas.rotate(180);
-				canvas.translate(-getWidth(), -getHeight());
-			} else {
-				mNextEdgeEffect.setSize(getHeight(), getWidth());
-				canvas.rotate(90);
-				canvas.translate(0, -getWidth());
-			}
-			needsMoreDrawing = mNextEdgeEffect.draw(canvas);
-			canvas.restore();
-		}
-		return needsMoreDrawing;
-	}
-
-	private boolean drawPreviousEdgeEffect(Canvas canvas) {
-		boolean needsMoreDrawing = false;
-		if (!mPreviousEdgeEffect.isFinished()) {
-			canvas.save();
-			if (isFlippingVertically()) {
-				mPreviousEdgeEffect.setSize(getWidth(), getHeight());
-				canvas.rotate(0);
-			} else {
-				mPreviousEdgeEffect.setSize(getHeight(), getWidth());
-				canvas.rotate(270);
-				canvas.translate(-getHeight(), 0);
-			}
-			needsMoreDrawing = mPreviousEdgeEffect.draw(canvas);
-			canvas.restore();
-		}
-		return needsMoreDrawing;
-	}
-
 	/**
 	 * draw top/left half
 	 * 
@@ -654,16 +571,16 @@ public class FlipView extends FrameLayout {
 	 */
 	private void drawPreviousHalf(Canvas canvas) {
 		final View v = viewForPage(getCurrentPageFloor());
-
-		// if the view does not exist, skip drawing it
-		if (v == null) {
-			return;
-		}
-
-		setDrawWithLayer(v, true);
+		
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
-		v.draw(canvas);
+
+		// if the view does not exist, skip drawing it
+		if (v != null) {
+			setDrawWithLayer(v, true);
+			v.draw(canvas);
+		}
+
 		drawPreviousShadow(canvas);
 		canvas.restore();
 	}
@@ -690,15 +607,15 @@ public class FlipView extends FrameLayout {
 	private void drawNextHalf(Canvas canvas) {
 		final View v = viewForPage(getCurrentPageCeil());
 
-		// if the view does not exist, skip drawing it
-		if (v == null) {
-			return;
-		}
-
-		setDrawWithLayer(v, true);
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mBottomRect : mRightRect);
-		v.draw(canvas);
+
+		// if the view does not exist, skip drawing it
+		if (v != null) {
+			setDrawWithLayer(v, true);
+			v.draw(canvas);
+		}
+		
 		drawNextShadow(canvas);
 		canvas.restore();
 	}
@@ -724,8 +641,6 @@ public class FlipView extends FrameLayout {
 		final float degreesFlipped = getDegreesFlipped();
 		canvas.save();
 		mCamera.save();
-		
-		Log.d("debug", "degreesFlipped = "+degreesFlipped);
 
 		if (degreesFlipped > 90) {
 			canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
@@ -800,9 +715,12 @@ public class FlipView extends FrameLayout {
 
 	private float getDegreesFlipped() {
 		float localFlipDistance = mFlipDistance % FLIP_DISTANCE_PER_PAGE;
+		
+		//fix for negative modulo. always want a positve flip degree
 		if(localFlipDistance < 0) {
 			localFlipDistance += FLIP_DISTANCE_PER_PAGE;
 		}
+		
 		return (localFlipDistance / FLIP_DISTANCE_PER_PAGE) * 180;
 	}
 
@@ -905,21 +823,7 @@ public class FlipView extends FrameLayout {
 			}
 		});
 	}
-
-	// binds the flip distance to the first and last page and return how much
-	// flipdistance was cut off. Used for calculating overflip
-	private float bindFlipDistance() {
-		final int minFlipDistance = 0;
-		final int maxFlipDistance = (mPageCount - 1) * FLIP_DISTANCE_PER_PAGE;
-		final float flipDistanceBeforeBinding = mFlipDistance;
-		if (mFlipDistance < minFlipDistance) {
-			mFlipDistance = 0;
-		} else if (mFlipDistance > maxFlipDistance) {
-			mFlipDistance = maxFlipDistance;
-		}
-		return flipDistanceBeforeBinding - mFlipDistance;
-	}
-
+	
 	private void onSecondaryPointerUp(MotionEvent ev) {
 		final int pointerIndex = MotionEventCompat.getActionIndex(ev);
 		final int pointerId = MotionEventCompat.getPointerId(ev, pointerIndex);
@@ -1195,6 +1099,7 @@ public class FlipView extends FrameLayout {
 	 */
 	public void setOverFlipMode(OverFlipMode overFlipMode) {
 		this.mOverFlipMode = overFlipMode;
+		mOverFlipper = OverFlipperFactory.create(this, mOverFlipMode);
 	}
 
 }
