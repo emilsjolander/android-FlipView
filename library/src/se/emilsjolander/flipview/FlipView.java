@@ -999,14 +999,16 @@ public class FlipView extends FrameLayout {
 		if (adapter != null) {
 			mAdapter = adapter;
 			mPageCount = mAdapter.getCount();
+			
+			mAdapter.registerDataSetObserver(dataSetObserver);
+			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
+			
 			//put the current page within the new adapter range
 			mCurrentPage = Math.min(mPageCount-1, mCurrentPage);
 			if (mPageCount != 0) {
 				mCurrentPageId = mAdapter.getItemId(mCurrentPage);
 				addView(viewForPage(mCurrentPage));
 			}
-			mAdapter.registerDataSetObserver(dataSetObserver);
-			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
 		} else {
 			mPageCount = 0;
 		}
