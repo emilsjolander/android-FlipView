@@ -190,16 +190,19 @@ public class FlipView extends FrameLayout {
 		if (mAdapter.hasStableIds()) {
 			mCurrentPage = getNewPositionOfCurrentPage();
 		}
-		mCurrentPageId = mAdapter.getItemId(mCurrentPage);
 
 		mPageCount = mAdapter.getCount();
+		mCurrentPage = Math.min(mPageCount, mCurrentPage);
 		removeAllViews();
 		mActivePageQueue.clear();
 		mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
-		if (mCurrentPage != currentPage) {
-			flipTo(mCurrentPage);
+		if (mPageCount != 0) {
+			mCurrentPageId = mAdapter.getItemId(mCurrentPage);
+			addView(viewForPage(mCurrentPage));
+			if (mCurrentPage != currentPage) {
+				flipTo(mCurrentPage);
+			}
 		}
-		addView(viewForPage(mCurrentPage));
 	}
 
 	private int getNewPositionOfCurrentPage() {
