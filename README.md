@@ -100,6 +100,14 @@ There is also a listener for detecting over flip. This is usefull when wanting t
 void setOnOverFlipListener(OnOverFlipListener onOverFlipListener);
 ```
 
+Much like AdapterView subclasses you can set a view that will be shown/hidden depending on if the FlipView has any data.
+```java
+void setEmptyView(View empty);
+```
+Remember that you are responsible for adding the view that you pass into this method into the view hierarchy. A typical way of using this method is to include a view in your layout file with `android:id="@+id/empty_view"` and then putting the following code in your onCreate() method.
+```java
+mFlipView.setEmptyView(findViewById(R.id.empty_view));
+```
 
 Contributing
 ------------
