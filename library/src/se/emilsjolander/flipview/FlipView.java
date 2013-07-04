@@ -114,6 +114,7 @@ public class FlipView extends FrameLayout {
 
 	private ListAdapter mAdapter;
 	private int mPageCount = 0;
+	private View mEmptyView;
 
 	private OnFlipListener mOnFlipListener;
 	private OnOverFlipListener mOnOverFlipListener;
@@ -191,18 +192,29 @@ public class FlipView extends FrameLayout {
 			mCurrentPage = getNewPositionOfCurrentPage();
 		}
 
-		mPageCount = mAdapter.getCount();
-		mCurrentPage = Math.min(mPageCount, mCurrentPage);
+		// remove all the current views
 		removeAllViews();
 		mActivePageQueue.clear();
+
+		mPageCount = mAdapter.getCount();
+
+		// put the current page within the new adapter range
+		mCurrentPage = Math.min(mPageCount, mCurrentPage);
+
 		mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
+
 		if (mPageCount != 0) {
 			mCurrentPageId = mAdapter.getItemId(mCurrentPage);
 			addView(viewForPage(mCurrentPage));
 			if (mCurrentPage != currentPage) {
 				flipTo(mCurrentPage);
 			}
+		} else {
+			mPageCount = 0;
+			mFlipDistance = 0;
 		}
+
+		updateEmptyStatus();
 	}
 
 	private int getNewPositionOfCurrentPage() {
@@ -310,6 +322,10 @@ public class FlipView extends FrameLayout {
 			return false;
 		}
 
+		if (mPageCount < 1) {
+			return false;
+		}
+
 		final int action = ev.getAction() & MotionEvent.ACTION_MASK;
 
 		if (action == MotionEvent.ACTION_CANCEL
@@ -390,7 +406,15 @@ public class FlipView extends FrameLayout {
 	@Override
 	public boolean onTouchEvent(MotionEvent ev) {
 
-		if (!mIsFlippingEnabled || !mIsFlipping && !mLastTouchAllowed) {
+		if (!mIsFlippingEnabled) {
+			return false;
+		}
+
+		if (mPageCount < 1) {
+			return false;
+		}
+
+		if (!mIsFlipping && !mLastTouchAllowed) {
 			return false;
 		}
 
@@ -409,7 +433,7 @@ public class FlipView extends FrameLayout {
 		switch (action & MotionEvent.ACTION_MASK) {
 		case MotionEvent.ACTION_DOWN:
 
-			// start flipping emediettly if interrupting some sort of animation
+			// start flipping immediately if interrupting some sort of animation
 			if (endScroll() || endPeak()) {
 				mIsFlipping = true;
 			}
@@ -476,7 +500,8 @@ public class FlipView extends FrameLayout {
 					if (mOnOverFlipListener != null) {
 						float overFlip = mOverFlipper.getTotalOverFlip();
 						mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
-								overFlip < 0, Math.abs(overFlip), FLIP_DISTANCE_PER_PAGE);
+								overFlip < 0, Math.abs(overFlip),
+								FLIP_DISTANCE_PER_PAGE);
 					}
 				} else if (mIsOverFlipping) {
 					mIsOverFlipping = false;
@@ -983,6 +1008,25 @@ public class FlipView extends FrameLayout {
 		mVelocityTracker.addMovement(ev);
 	}
 
+	private void updateEmptyStatus() {
+		boolean empty = mAdapter == null || mPageCount == 0;
+
+		if (empty) {
+			if (mEmptyView != null) {
+				mEmptyView.setVisibility(View.VISIBLE);
+				setVisibility(View.GONE);
+			} else {
+				setVisibility(View.VISIBLE);
+			}
+
+		} else {
+			if (mEmptyView != null) {
+				mEmptyView.setVisibility(View.GONE);
+			}
+			setVisibility(View.VISIBLE);
+		}
+	}
+
 	/* ---------- API ---------- */
 
 	/**
@@ -995,26 +1039,32 @@ public class FlipView extends FrameLayout {
 	public void setAdapter(ListAdapter adapter) {
 		if (mAdapter != null) {
 			mAdapter.unregisterDataSetObserver(dataSetObserver);
-			mAdapter = null;
 		}
+
+		// remove all the current views
 		removeAllViews();
 		mActivePageQueue.clear();
+
+		mAdapter = adapter;
+		mPageCount = adapter == null ? 0 : mAdapter.getCount();
+
+		// put the current page within the new adapter range
+		mCurrentPage = Math.min(mPageCount - 1, mCurrentPage);
+
 		if (adapter != null) {
-			mAdapter = adapter;
-			mPageCount = mAdapter.getCount();
-			
 			mAdapter.registerDataSetObserver(dataSetObserver);
 			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
-			
-			//put the current page within the new adapter range
-			mCurrentPage = Math.min(mPageCount-1, mCurrentPage);
-			if (mPageCount != 0) {
-				mCurrentPageId = mAdapter.getItemId(mCurrentPage);
-				addView(viewForPage(mCurrentPage));
-			}
+		}
+
+		if (mPageCount != 0) {
+			mCurrentPageId = mAdapter.getItemId(mCurrentPage);
+			addView(viewForPage(mCurrentPage));
 		} else {
 			mPageCount = 0;
+			mFlipDistance = 0;
 		}
+
+		updateEmptyStatus();
 	}
 
 	public ListAdapter getAdapter() {
@@ -1129,6 +1179,17 @@ public class FlipView extends FrameLayout {
 	public void setOverFlipMode(OverFlipMode overFlipMode) {
 		this.mOverFlipMode = overFlipMode;
 		mOverFlipper = OverFlipperFactory.create(this, mOverFlipMode);
+	}
+
+	/**
+	 * @param emptyView
+	 *            The view to show when either no adapter is set or the adapter
+	 *            has no items. This should be a view already in the view
+	 *            hierarchy which the FlipView will set the visibility of.
+	 */
+	public void setEmptyView(View emptyView) {
+		mEmptyView = emptyView;
+		updateEmptyStatus();
 	}
 
 }

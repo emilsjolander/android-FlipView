@@ -26,7 +26,8 @@ public class MainActivity extends Activity implements Callback, OnFlipListener, 
 		mFlipView.setAdapter(mAdapter);
 		mFlipView.setOnFlipListener(this);
 		mFlipView.peakNext(false);
-		mFlipView.setOverFlipMode(OverFlipMode.RUBBER_BAND);
+		mFlipView.setOverFlipMode(OverFlipMode.GLOW);
+		mFlipView.setEmptyView(findViewById(R.id.empty_view));
 		mFlipView.setOnOverFlipListener(this);
 		
 	}
