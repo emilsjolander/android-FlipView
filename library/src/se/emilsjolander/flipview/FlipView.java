@@ -1091,6 +1091,7 @@ public class FlipView extends FrameLayout {
 		if (page < 0 || page > mPageCount - 1) {
 			throw new IllegalArgumentException("That page does not exist");
 		}
+		endFlip();
 		mFlipDistance = page * FLIP_DISTANCE_PER_PAGE;
 		invalidate();
 	}
@@ -1106,6 +1107,7 @@ public class FlipView extends FrameLayout {
 		final int start = (int) mFlipDistance;
 		final int delta = page * FLIP_DISTANCE_PER_PAGE - start;
 
+		endFlip();
 		mScroller.startScroll(0, start, 0, delta, getFlipDuration(delta));
 		invalidate();
 	}
