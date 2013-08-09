@@ -21,7 +21,6 @@ import android.graphics.Rect;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -55,8 +54,10 @@ public class FlipView extends FrameLayout {
 			this.view = view;
 		}
 	}
-	
-	private static final int INVALID_PAGE_POSITION = -1;//this will be the postion when there is not data
+
+	private static final int INVALID_PAGE_POSITION = -1;// this will be the
+														// postion when there is
+														// not data
 
 	private static final int PEAK_ANIM_DURATION = 600;// in ms
 	private static final int MAX_SINGLE_PAGE_FLIP_ANIM_DURATION = 300;// in ms
@@ -188,13 +189,14 @@ public class FlipView extends FrameLayout {
 
 	private void dataSetChanged() {
 		final int currentPage = mCurrentPage;
+		int newPosition = currentPage;
 
 		// if the adapter has stable ids, try to keep the page currently on
 		// stable.
-		if (mAdapter.hasStableIds() && mCurrentPage != INVALID_PAGE_POSITION) {
-			mCurrentPage = getNewPositionOfCurrentPage();
-		} else if (mCurrentPage == INVALID_PAGE_POSITION) {
-			mCurrentPage = 0;
+		if (mAdapter.hasStableIds() && currentPage != INVALID_PAGE_POSITION) {
+			newPosition = getNewPositionOfCurrentPage();
+		} else if (currentPage == INVALID_PAGE_POSITION) {
+			newPosition = 0;
 		}
 
 		// remove all the current views
@@ -204,14 +206,15 @@ public class FlipView extends FrameLayout {
 		mPageCount = mAdapter.getCount();
 
 		// put the current page within the new adapter range
-		mCurrentPage = Math.min(mPageCount - 1, mCurrentPage == INVALID_PAGE_POSITION ? 0 : mCurrentPage);
+		newPosition = Math.min(mPageCount - 1,
+				newPosition == INVALID_PAGE_POSITION ? 0 : newPosition);
 
-		if (mCurrentPage != INVALID_PAGE_POSITION) {
+		if (newPosition != INVALID_PAGE_POSITION) {
 			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
-			mCurrentPageId = mAdapter.getItemId(mCurrentPage);
-			addView(viewForPage(mCurrentPage));
-			if (mCurrentPage != currentPage) {
-				flipTo(mCurrentPage);
+			mCurrentPageId = mAdapter.getItemId(newPosition);
+			addView(viewForPage(newPosition));
+			if (newPosition != currentPage) {
+				flipTo(newPosition);
 			}
 		} else {
 			mPageCount = 0;
@@ -222,10 +225,6 @@ public class FlipView extends FrameLayout {
 	}
 
 	private int getNewPositionOfCurrentPage() {
-		
-		Log.d("debug", "mCurrentPage = "+mCurrentPage);
-		Log.d("debug", "mCurrentPageId = "+mCurrentPageId);
-		
 		// check if id is on same position, this is because it will
 		// often be that and this way you do not need to iterate the whole
 		// dataset. If it is the same position, you are done.
@@ -1057,7 +1056,8 @@ public class FlipView extends FrameLayout {
 		mPageCount = adapter == null ? 0 : mAdapter.getCount();
 
 		// put the current page within the new adapter range
-		mCurrentPage = Math.min(mPageCount - 1, mCurrentPage == INVALID_PAGE_POSITION ? 0 : mCurrentPage);
+		mCurrentPage = Math.min(mPageCount - 1,
+				mCurrentPage == INVALID_PAGE_POSITION ? 0 : mCurrentPage);
 
 		if (adapter != null) {
 			mAdapter.registerDataSetObserver(dataSetObserver);
