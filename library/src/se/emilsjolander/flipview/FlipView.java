@@ -604,6 +604,8 @@ public class FlipView extends FrameLayout {
 				mCurrentPageId = mAdapter.getItemId(mCurrentPage);
 			}
 			setDrawWithLayer(v, false);
+
+			// TODO use drawChild() instead
 			v.draw(canvas);
 		}
 
@@ -633,6 +635,8 @@ public class FlipView extends FrameLayout {
 		// if the view does not exist, skip drawing it
 		if (v != null) {
 			setDrawWithLayer(v, true);
+
+			// TODO use drawChild() instead
 			v.draw(canvas);
 		}
 
@@ -668,6 +672,8 @@ public class FlipView extends FrameLayout {
 		// if the view does not exist, skip drawing it
 		if (v != null) {
 			setDrawWithLayer(v, true);
+
+			// TODO use drawChild() instead
 			v.draw(canvas);
 		}
 
@@ -718,6 +724,7 @@ public class FlipView extends FrameLayout {
 		positionMatrix();
 		canvas.concat(mMatrix);
 
+		// TODO use drawChild() instead
 		v.draw(canvas);
 
 		drawFlippingShadeShine(canvas);
