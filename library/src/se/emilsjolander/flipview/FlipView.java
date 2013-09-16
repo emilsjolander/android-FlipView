@@ -347,7 +347,7 @@ public class FlipView extends FrameLayout {
 
 		mFlipDistance = flipDistance;
 
-		final int currentPageIndex = (int) Math.ceil(mFlipDistance
+		final int currentPageIndex = (int) Math.round(mFlipDistance
 				/ FLIP_DISTANCE_PER_PAGE);
 
 		if (mCurrentPageIndex != currentPageIndex) {
@@ -719,10 +719,13 @@ public class FlipView extends FrameLayout {
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
 
+		final float degreesFlipped = getDegreesFlipped();
+		final Page p = degreesFlipped > 90 ? mPreviousPage : mCurrentPage;
+
 		// if the view does not exist, skip drawing it
-		if (mPreviousPage.valid) {
-			setDrawWithLayer(mPreviousPage.v, true);
-			drawChild(canvas, mPreviousPage.v, 0);
+		if (p.valid) {
+			setDrawWithLayer(p.v, true);
+			drawChild(canvas, p.v, 0);
 		}
 
 		drawPreviousShadow(canvas);
@@ -751,11 +754,14 @@ public class FlipView extends FrameLayout {
 	private void drawNextHalf(Canvas canvas) {
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mBottomRect : mRightRect);
+		
+		final float degreesFlipped = getDegreesFlipped();
+		final Page p = degreesFlipped > 90 ? mCurrentPage : mNextPage;
 
 		// if the view does not exist, skip drawing it
-		if (mCurrentPage.valid) {
-			setDrawWithLayer(mCurrentPage.v, true);
-			drawChild(canvas, mCurrentPage.v, 0);
+		if (p.valid) {
+			setDrawWithLayer(p.v, true);
+			drawChild(canvas, p.v, 0);
 		}
 
 		drawNextShadow(canvas);
@@ -777,12 +783,10 @@ public class FlipView extends FrameLayout {
 	}
 
 	private void drawFlippingHalf(Canvas canvas) {
-		final float degreesFlipped = getDegreesFlipped();
-
-		final View v = degreesFlipped > 90 ? mCurrentPage.v : mPreviousPage.v;
-
 		canvas.save();
 		mCamera.save();
+		
+		final float degreesFlipped = getDegreesFlipped();
 
 		if (degreesFlipped > 90) {
 			canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
@@ -805,8 +809,8 @@ public class FlipView extends FrameLayout {
 		positionMatrix();
 		canvas.concat(mMatrix);
 
-		setDrawWithLayer(v, true);
-		drawChild(canvas, v, 0);
+		setDrawWithLayer(mCurrentPage.v, true);
+		drawChild(canvas, mCurrentPage.v, 0);
 
 		drawFlippingShadeShine(canvas);
 
@@ -859,7 +863,7 @@ public class FlipView extends FrameLayout {
 	private float getDegreesFlipped() {
 		float localFlipDistance = mFlipDistance % FLIP_DISTANCE_PER_PAGE;
 
-		// fix for negative modulo. always want a positve flip degree
+		// fix for negative modulo. always want a positive flip degree
 		if (localFlipDistance < 0) {
 			localFlipDistance += FLIP_DISTANCE_PER_PAGE;
 		}
