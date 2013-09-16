@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Toast;
 
 public class MainActivity extends Activity implements Callback, OnFlipListener, OnOverFlipListener {
 	
@@ -26,7 +25,7 @@ public class MainActivity extends Activity implements Callback, OnFlipListener, 
 		mFlipView.setAdapter(mAdapter);
 		mFlipView.setOnFlipListener(this);
 		mFlipView.peakNext(false);
-		mFlipView.setOverFlipMode(OverFlipMode.GLOW);
+		mFlipView.setOverFlipMode(OverFlipMode.RUBBER_BAND);
 		mFlipView.setEmptyView(findViewById(R.id.empty_view));
 		mFlipView.setOnOverFlipListener(this);
 		
@@ -55,7 +54,7 @@ public class MainActivity extends Activity implements Callback, OnFlipListener, 
 
 	@Override
 	public void onFlippedToPage(FlipView v, int position, long id) {
-		Toast.makeText(getBaseContext(), "Page: "+position, Toast.LENGTH_SHORT).show();
+		Log.i("pageflip", "Page: "+position);
 		if(position > mFlipView.getPageCount()-3 && mFlipView.getPageCount()<30){
 			mAdapter.addItems(5);
 		}

@@ -5,7 +5,7 @@ import android.graphics.Canvas;
 public class RubberBandOverFlipper implements OverFlipper {
 
 	private static final float MAX_OVER_FLIP_DISTANCE = 70;
-	private static final float EXPONENTIAL_DECREES = 0.80f;
+	private static final float EXPONENTIAL_DECREES = 0.90f;
 	
 	private float mTotalOverFlip;
 	private float mCurrentOverFlip;

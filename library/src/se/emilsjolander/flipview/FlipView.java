@@ -57,6 +57,8 @@ public class FlipView extends FrameLayout {
 
 	// this will be the postion when there is not data
 	private static final int INVALID_PAGE_POSITION = -1;
+	// "null" flip distance
+	private static final int INVALID_FLIP_DISTANCE = -1;
 
 	private static final int PEAK_ANIM_DURATION = 600;// in ms
 	private static final int MAX_SINGLE_PAGE_FLIP_ANIM_DURATION = 300;// in ms
@@ -127,8 +129,9 @@ public class FlipView extends FrameLayout {
 	private OnFlipListener mOnFlipListener;
 	private OnOverFlipListener mOnOverFlipListener;
 
-	private float mFlipDistance = 0;
+	private float mFlipDistance = INVALID_FLIP_DISTANCE;
 	private int mCurrentPageIndex = INVALID_PAGE_POSITION;
+	private int mLastDispatchedPageEventIndex = 0;
 	private long mCurrentPageId = 0;
 
 	private OverFlipMode mOverFlipMode;
@@ -177,8 +180,9 @@ public class FlipView extends FrameLayout {
 
 	private void init() {
 		final Context context = getContext();
-		mScroller = new Scroller(context, flipInterpolator);
 		final ViewConfiguration configuration = ViewConfiguration.get(context);
+
+		mScroller = new Scroller(context, flipInterpolator);
 		mTouchSlop = configuration.getScaledPagingTouchSlop();
 		mMinimumVelocity = configuration.getScaledMinimumFlingVelocity();
 		mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
@@ -218,8 +222,10 @@ public class FlipView extends FrameLayout {
 			// TODO pretty confusing
 			// this will be correctly set in setFlipDistance method
 			mCurrentPageIndex = INVALID_PAGE_POSITION;
+			mFlipDistance = INVALID_FLIP_DISTANCE;
 			flipTo(newPosition);
 		} else {
+			mFlipDistance = INVALID_FLIP_DISTANCE;
 			mPageCount = 0;
 			setFlipDistance(0);
 		}
@@ -335,21 +341,21 @@ public class FlipView extends FrameLayout {
 			return;
 		}
 
+		if (flipDistance == mFlipDistance) {
+			return;
+		}
+
 		mFlipDistance = flipDistance;
 
-		int currentPageIndex = (int) Math.ceil(mFlipDistance
+		final int currentPageIndex = (int) Math.ceil(mFlipDistance
 				/ FLIP_DISTANCE_PER_PAGE);
-		if (currentPageIndex < 0) {
-			currentPageIndex = 0;
-		} else if (currentPageIndex > mPageCount - 1) {
-			currentPageIndex = mPageCount - 1;
-		}
 
 		if (mCurrentPageIndex != currentPageIndex) {
 			mCurrentPageIndex = currentPageIndex;
 			mCurrentPageId = mAdapter.getItemId(mCurrentPageIndex);
-			postFlippedToPage(mCurrentPageIndex);
 
+			// TODO be smarter about this. Dont remove a view that will be added
+			// again on the next line.
 			recycleActiveViews();
 
 			// add the new active views
@@ -357,7 +363,7 @@ public class FlipView extends FrameLayout {
 				fillPageForIndex(mPreviousPage, mCurrentPageIndex - 1);
 				addView(mPreviousPage.v);
 			}
-			if (mPageCount > 0) {
+			if (mCurrentPageIndex >= 0 && mCurrentPageIndex < mPageCount) {
 				fillPageForIndex(mCurrentPage, mCurrentPageIndex);
 				addView(mCurrentPage.v);
 			}
@@ -366,6 +372,8 @@ public class FlipView extends FrameLayout {
 				addView(mNextPage.v);
 			}
 		}
+
+		invalidate();
 	}
 
 	private void fillPageForIndex(Page p, int i) {
@@ -614,8 +622,6 @@ public class FlipView extends FrameLayout {
 								true, 0, FLIP_DISTANCE_PER_PAGE);
 					}
 				}
-
-				invalidate();
 			}
 			break;
 		case MotionEvent.ACTION_UP:
@@ -672,11 +678,8 @@ public class FlipView extends FrameLayout {
 			return;
 		}
 
-		boolean needsInvalidate = false;
-
 		if (!mScroller.isFinished() && mScroller.computeScrollOffset()) {
 			setFlipDistance(mScroller.getCurrY());
-			needsInvalidate = true;
 		}
 
 		if (mIsFlipping || !mScroller.isFinished() || mPeakAnim != null) {
@@ -685,18 +688,21 @@ public class FlipView extends FrameLayout {
 			drawFlippingHalf(canvas);
 		} else {
 			endScroll();
-
 			setDrawWithLayer(mCurrentPage.v, false);
+			drawChild(canvas, mCurrentPage.v, 0);
 
-			// TODO use drawChild() instead
-			mCurrentPage.v.draw(canvas);
+			// dispatch listener event now that we have "landed" on a page.
+			// TODO not the prettiest to have this with the drawing logic,
+			// should change.
+			if (mLastDispatchedPageEventIndex != mCurrentPageIndex) {
+				mLastDispatchedPageEventIndex = mCurrentPageIndex;
+				postFlippedToPage(mCurrentPageIndex);
+			}
 		}
 
 		// if overflip is GLOW mode and the edge effects needed drawing, make
 		// sure to invalidate
-		needsInvalidate |= mOverFlipper.draw(canvas);
-
-		if (needsInvalidate) {
+		if (mOverFlipper.draw(canvas)) {
 			// always invalidate whole screen as it is needed 99% of the time.
 			// This is because of the shadows and shines put on the non-flipping
 			// pages
@@ -714,7 +720,7 @@ public class FlipView extends FrameLayout {
 		canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
 
 		// if the view does not exist, skip drawing it
-		if (mPreviousPage != null) {
+		if (mPreviousPage.valid) {
 			setDrawWithLayer(mPreviousPage.v, true);
 			drawChild(canvas, mPreviousPage.v, 0);
 		}
@@ -747,7 +753,7 @@ public class FlipView extends FrameLayout {
 		canvas.clipRect(isFlippingVertically() ? mBottomRect : mRightRect);
 
 		// if the view does not exist, skip drawing it
-		if (mNextPage != null) {
+		if (mCurrentPage.valid) {
 			setDrawWithLayer(mCurrentPage.v, true);
 			drawChild(canvas, mCurrentPage.v, 0);
 		}
@@ -989,7 +995,6 @@ public class FlipView extends FrameLayout {
 			@Override
 			public void onAnimationUpdate(ValueAnimator animation) {
 				setFlipDistance((Float) animation.getAnimatedValue());
-				invalidate();
 			}
 		});
 		mPeakAnim.addListener(new AnimatorListenerAdapter() {
@@ -1060,6 +1065,7 @@ public class FlipView extends FrameLayout {
 		// TODO pretty confusing
 		// this will be correctly set in setFlipDistance method
 		mCurrentPageIndex = INVALID_PAGE_POSITION;
+		mFlipDistance = INVALID_FLIP_DISTANCE;
 		setFlipDistance(0);
 
 		updateEmptyStatus();
@@ -1083,7 +1089,6 @@ public class FlipView extends FrameLayout {
 		}
 		endFlip();
 		setFlipDistance(page * FLIP_DISTANCE_PER_PAGE);
-		invalidate();
 	}
 
 	public void flipBy(int delta) {
