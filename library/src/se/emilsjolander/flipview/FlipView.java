@@ -846,10 +846,12 @@ public class FlipView extends FrameLayout {
 	 * @param drawWithLayer
 	 */
 	private void setDrawWithLayer(View v, boolean drawWithLayer) {
-		if (v.getLayerType() != LAYER_TYPE_HARDWARE && drawWithLayer) {
-			v.setLayerType(LAYER_TYPE_HARDWARE, null);
-		} else if (v.getLayerType() != LAYER_TYPE_NONE && !drawWithLayer) {
-			v.setLayerType(LAYER_TYPE_NONE, null);
+		if (isHardwareAccelerated()) {
+			if (v.getLayerType() != LAYER_TYPE_HARDWARE && drawWithLayer) {
+				v.setLayerType(LAYER_TYPE_HARDWARE, null);
+			} else if (v.getLayerType() != LAYER_TYPE_NONE && !drawWithLayer) {
+				v.setLayerType(LAYER_TYPE_NONE, null);
+			}
 		}
 	}
 
