@@ -28,7 +28,7 @@ public class Recycler {
 			throw new IllegalArgumentException("Can't have a viewTypeCount < 1");
 		}
 		// do nothing if the view type count has not changed.
-		if (currentScraps != null && viewTypeCount == currentScraps.size()) {
+		if (currentScraps != null && viewTypeCount == scraps.length) {
 			return;
 		}
 		// noinspection unchecked
@@ -62,7 +62,7 @@ public class Recycler {
 	void addScrapView(View scrap, int position, int viewType) {
 		// create a new Scrap
 		Scrap item = new Scrap(scrap, true);
-
+		
 		if (viewTypeCount == 1) {
 			currentScraps.put(position, item);
 		} else {
