@@ -208,7 +208,7 @@ public class FlipView extends FrameLayout {
 		}
 
 		// remove all the current views
-		removeAllViews();
+		recycleActiveViews();
 		mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
 		mRecycler.invalidateScraps();
 
