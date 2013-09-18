@@ -683,12 +683,14 @@ public class FlipView extends FrameLayout {
 		}
 
 		if (mIsFlipping || !mScroller.isFinished() || mPeakAnim != null) {
+			showAllPages();
 			drawPreviousHalf(canvas);
 			drawNextHalf(canvas);
 			drawFlippingHalf(canvas);
 		} else {
 			endScroll();
 			setDrawWithLayer(mCurrentPage.v, false);
+			hideOtherPages(mCurrentPage);
 			drawChild(canvas, mCurrentPage.v, 0);
 
 			// dispatch listener event now that we have "landed" on a page.
@@ -707,6 +709,31 @@ public class FlipView extends FrameLayout {
 			// This is because of the shadows and shines put on the non-flipping
 			// pages
 			invalidate();
+		}
+	}
+
+	private void hideOtherPages(Page p) {
+		if (mPreviousPage != p && mPreviousPage.valid && mPreviousPage.v.getVisibility() != GONE) {
+			mPreviousPage.v.setVisibility(GONE);
+		}
+		if (mCurrentPage != p && mCurrentPage.valid && mCurrentPage.v.getVisibility() != GONE) {
+			mCurrentPage.v.setVisibility(GONE);
+		}
+		if (mNextPage != p && mNextPage.valid && mNextPage.v.getVisibility() != GONE) {
+			mNextPage.v.setVisibility(GONE);
+		}
+		p.v.setVisibility(VISIBLE);
+	}
+
+	private void showAllPages() {
+		if (mPreviousPage.valid && mPreviousPage.v.getVisibility() != VISIBLE) {
+			mPreviousPage.v.setVisibility(VISIBLE);
+		}
+		if (mCurrentPage.valid && mCurrentPage.v.getVisibility() != VISIBLE) {
+			mCurrentPage.v.setVisibility(VISIBLE);
+		}
+		if (mNextPage.valid && mNextPage.v.getVisibility() != VISIBLE) {
+			mNextPage.v.setVisibility(VISIBLE);
 		}
 	}
 
