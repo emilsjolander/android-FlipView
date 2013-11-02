@@ -3,25 +3,30 @@ FlipView
 
 About
 -----
-
 This library is made to be very easy to use and at the same time be feature complete.
 With only a few lines of code you can have a flipping animation between your views, 
 this looks and acts very much like the Flipboard application (I am however not affiliated with them in any way).
 
 All flipping animations should be very smooth and i have added lighting effects so the flipping look more realistic.
 
-Honeycomb (sdk 11) or above is required for this library to work properly, however it will compile (and run, though without good performance) for much lower versions with just a few tweaks.
+Honeycomb (api lvl 11) or above is required for this library to work properly, however it will compile (and run, though without good performance) for much lower versions with just a few tweaks.
 
-Download a compiled version of the apk here:
-https://www.dropbox.com/s/y4pukhdr3a3ugj8/FlipViewSample.apk
+Download a compiled version of the sample here:
+https://www.dropbox.com/s/tvmdhre4ra8l41p/sample-debug-unaligned.apk
 
+Installing
+---------------
+###Gradle
+Add the following gradle dependency exchanging `x.x.x` for the latest release.
+```groovy
+dependencies {
+    compile 'se.emilsjolander:android-flipview:x.x.x'
+}
+```
 
 Usage
 -----
-
-First thing you have to do is download the library and add it as a library project to your project.
-
-Next you should create a layout file container a something similar to this:
+After installing, create a layout file container a something similar to this:
 ```xml
 <se.emilsjolander.flipview.FlipView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:flipview="http://schemas.android.com/apk/res-auto"
@@ -44,7 +49,6 @@ flipView.setAdapter(adapter);
 
 Api
 ---
-
 I have designed the api to be as similar as possible to that of a ```ListView```.
 
 FlipView uses a regular ```ListAdapter```, get and set the adapter with the following methods:
@@ -111,7 +115,6 @@ mFlipView.setEmptyView(findViewById(R.id.empty_view));
 
 Contributing
 ------------
-
 Pull requests and issues are very welcome!
 
 Feature request are also welcome but i can't make any promise that they will make it in.
