@@ -1,8 +1,6 @@
 package se.emilsjolander.flipview;
 
-import java.util.LinkedList;
-import java.util.Queue;
-
+import se.emilsjolander.flipview.Recycler.Scrap;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.TimeInterpolator;
@@ -44,34 +42,42 @@ public class FlipView extends FrameLayout {
 				float flipDistancePerPage);
 	}
 
-	// wrapper class used when keeping track of active views
+	/**
+	 * 
+	 * @author emilsjolander
+	 * 
+	 *         Class to hold a view and its corresponding info
+	 */
 	static class Page {
+		View v;
 		int position;
-		View view;
-
-		public Page(int position, View view) {
-			this.position = position;
-			this.view = view;
-		}
+		int viewType;
+		boolean valid;
 	}
 
-	private static final int INVALID_PAGE_POSITION = -1;// this will be the
-														// postion when there is
-														// not data
+	// this will be the postion when there is not data
+	private static final int INVALID_PAGE_POSITION = -1;
+	// "null" flip distance
+	private static final int INVALID_FLIP_DISTANCE = -1;
 
 	private static final int PEAK_ANIM_DURATION = 600;// in ms
 	private static final int MAX_SINGLE_PAGE_FLIP_ANIM_DURATION = 300;// in ms
-	private static final int FLIP_DISTANCE_PER_PAGE = 180; // for normalizing
-															// width/height
+
+	// for normalizing width/height
+	private static final int FLIP_DISTANCE_PER_PAGE = 180;
 	private static final int MAX_SHADOW_ALPHA = 180;// out of 255
 	private static final int MAX_SHADE_ALPHA = 130;// out of 255
 	private static final int MAX_SHINE_ALPHA = 100;// out of 255
-	private static final int INVALID_POINTER = -1;// value for no pointer
-	private static final int VERTICAL_FLIP = 0;// constant used by the
-												// attributes
+
+	// value for no pointer
+	private static final int INVALID_POINTER = -1;
+
+	// constant used by the attributes
+	private static final int VERTICAL_FLIP = 0;
+
+	// constant used by the attributes
 	@SuppressWarnings("unused")
-	private static final int HORIZONTAL_FLIP = 1;// constant used by the
-													// attributes
+	private static final int HORIZONTAL_FLIP = 1;
 
 	private DataSetObserver dataSetObserver = new DataSetObserver() {
 
@@ -113,18 +119,19 @@ public class FlipView extends FrameLayout {
 	// views get recycled after they have been pushed out of the active queue
 	private Recycler mRecycler = new Recycler();
 
-	// holds all views that are currently in use, hold max of 3 views as of now
-	private Queue<Page> mActivePageQueue = new LinkedList<FlipView.Page>();
-
 	private ListAdapter mAdapter;
 	private int mPageCount = 0;
+	private Page mPreviousPage = new Page();
+	private Page mCurrentPage = new Page();
+	private Page mNextPage = new Page();
 	private View mEmptyView;
 
 	private OnFlipListener mOnFlipListener;
 	private OnOverFlipListener mOnOverFlipListener;
 
-	private float mFlipDistance = 0;
-	private int mCurrentPage = INVALID_PAGE_POSITION;
+	private float mFlipDistance = INVALID_FLIP_DISTANCE;
+	private int mCurrentPageIndex = INVALID_PAGE_POSITION;
+	private int mLastDispatchedPageEventIndex = 0;
 	private long mCurrentPageId = 0;
 
 	private OverFlipMode mOverFlipMode;
@@ -173,8 +180,9 @@ public class FlipView extends FrameLayout {
 
 	private void init() {
 		final Context context = getContext();
-		mScroller = new Scroller(context, flipInterpolator);
 		final ViewConfiguration configuration = ViewConfiguration.get(context);
+
+		mScroller = new Scroller(context, flipInterpolator);
 		mTouchSlop = configuration.getScaledPagingTouchSlop();
 		mMinimumVelocity = configuration.getScaledMinimumFlingVelocity();
 		mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
@@ -188,7 +196,7 @@ public class FlipView extends FrameLayout {
 	}
 
 	private void dataSetChanged() {
-		final int currentPage = mCurrentPage;
+		final int currentPage = mCurrentPageIndex;
 		int newPosition = currentPage;
 
 		// if the adapter has stable ids, try to keep the page currently on
@@ -200,8 +208,9 @@ public class FlipView extends FrameLayout {
 		}
 
 		// remove all the current views
-		removeAllViews();
-		mActivePageQueue.clear();
+		recycleActiveViews();
+		mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
+		mRecycler.invalidateScraps();
 
 		mPageCount = mAdapter.getCount();
 
@@ -210,15 +219,15 @@ public class FlipView extends FrameLayout {
 				newPosition == INVALID_PAGE_POSITION ? 0 : newPosition);
 
 		if (newPosition != INVALID_PAGE_POSITION) {
-			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
-			mCurrentPageId = mAdapter.getItemId(newPosition);
-			addView(viewForPage(newPosition));
-			if (newPosition != currentPage) {
-				flipTo(newPosition);
-			}
+			// TODO pretty confusing
+			// this will be correctly set in setFlipDistance method
+			mCurrentPageIndex = INVALID_PAGE_POSITION;
+			mFlipDistance = INVALID_FLIP_DISTANCE;
+			flipTo(newPosition);
 		} else {
+			mFlipDistance = INVALID_FLIP_DISTANCE;
 			mPageCount = 0;
-			mFlipDistance = 0;
+			setFlipDistance(0);
 		}
 
 		updateEmptyStatus();
@@ -228,8 +237,8 @@ public class FlipView extends FrameLayout {
 		// check if id is on same position, this is because it will
 		// often be that and this way you do not need to iterate the whole
 		// dataset. If it is the same position, you are done.
-		if (mCurrentPageId == mAdapter.getItemId(mCurrentPage)) {
-			return mCurrentPage;
+		if (mCurrentPageId == mAdapter.getItemId(mCurrentPageIndex)) {
+			return mCurrentPageIndex;
 		}
 
 		// iterate the dataset and look for the correct id. If it
@@ -241,7 +250,7 @@ public class FlipView extends FrameLayout {
 		}
 
 		// Id no longer is dataset, keep current page
-		return mCurrentPage;
+		return mCurrentPageIndex;
 	}
 
 	private void dataSetInvalidated() {
@@ -320,6 +329,98 @@ public class FlipView extends FrameLayout {
 
 	private void layoutChild(View child) {
 		child.layout(0, 0, getWidth(), getHeight());
+	}
+
+	private void setFlipDistance(float flipDistance) {
+
+		if (mPageCount < 1) {
+			mFlipDistance = 0;
+			mCurrentPageIndex = INVALID_PAGE_POSITION;
+			mCurrentPageId = -1;
+			recycleActiveViews();
+			return;
+		}
+
+		if (flipDistance == mFlipDistance) {
+			return;
+		}
+
+		mFlipDistance = flipDistance;
+
+		final int currentPageIndex = (int) Math.round(mFlipDistance
+				/ FLIP_DISTANCE_PER_PAGE);
+
+		if (mCurrentPageIndex != currentPageIndex) {
+			mCurrentPageIndex = currentPageIndex;
+			mCurrentPageId = mAdapter.getItemId(mCurrentPageIndex);
+
+			// TODO be smarter about this. Dont remove a view that will be added
+			// again on the next line.
+			recycleActiveViews();
+
+			// add the new active views
+			if (mCurrentPageIndex > 0) {
+				fillPageForIndex(mPreviousPage, mCurrentPageIndex - 1);
+				addView(mPreviousPage.v);
+			}
+			if (mCurrentPageIndex >= 0 && mCurrentPageIndex < mPageCount) {
+				fillPageForIndex(mCurrentPage, mCurrentPageIndex);
+				addView(mCurrentPage.v);
+			}
+			if (mCurrentPageIndex < mPageCount - 1) {
+				fillPageForIndex(mNextPage, mCurrentPageIndex + 1);
+				addView(mNextPage.v);
+			}
+		}
+
+		invalidate();
+	}
+
+	private void fillPageForIndex(Page p, int i) {
+		p.position = i;
+		p.viewType = mAdapter.getItemViewType(p.position);
+		p.v = getView(p.position, p.viewType);
+		p.valid = true;
+	}
+
+	private void recycleActiveViews() {
+		// remove and recycle the currently active views
+		if (mPreviousPage.valid) {
+			removeView(mPreviousPage.v);
+			mRecycler.addScrapView(mPreviousPage.v, mPreviousPage.position,
+					mPreviousPage.viewType);
+			mPreviousPage.valid = false;
+		}
+		if (mCurrentPage.valid) {
+			removeView(mCurrentPage.v);
+			mRecycler.addScrapView(mCurrentPage.v, mCurrentPage.position,
+					mCurrentPage.viewType);
+			mCurrentPage.valid = false;
+		}
+		if (mNextPage.valid) {
+			removeView(mNextPage.v);
+			mRecycler.addScrapView(mNextPage.v, mNextPage.position,
+					mNextPage.viewType);
+			mNextPage.valid = false;
+		}
+	}
+
+	private View getView(int index, int viewType) {
+		// get the scrap from the recycler corresponding to the correct view
+		// type
+		Scrap scrap = mRecycler.getScrapView(index, viewType);
+
+		// get a view from the adapter if a scrap was not found or it is
+		// invalid.
+		View v = null;
+		if (scrap == null || !scrap.valid) {
+			v = mAdapter.getView(index, scrap == null ? null : scrap.v, this);
+		} else {
+			v = scrap.v;
+		}
+
+		// return view
+		return v;
 	}
 
 	@Override
@@ -493,7 +594,7 @@ public class FlipView extends FrameLayout {
 
 				deltaFlipDistance /= ((isFlippingVertically() ? getHeight()
 						: getWidth()) / FLIP_DISTANCE_PER_PAGE);
-				mFlipDistance += deltaFlipDistance;
+				setFlipDistance(mFlipDistance + deltaFlipDistance);
 
 				final int minFlipDistance = 0;
 				final int maxFlipDistance = (mPageCount - 1)
@@ -502,8 +603,8 @@ public class FlipView extends FrameLayout {
 						|| mFlipDistance > maxFlipDistance;
 				if (isOverFlipping) {
 					mIsOverFlipping = true;
-					mFlipDistance = mOverFlipper.calculate(mFlipDistance,
-							minFlipDistance, maxFlipDistance);
+					setFlipDistance(mOverFlipper.calculate(mFlipDistance,
+							minFlipDistance, maxFlipDistance));
 					if (mOnOverFlipListener != null) {
 						float overFlip = mOverFlipper.getTotalOverFlip();
 						mOnOverFlipListener.onOverFlip(this, mOverFlipMode,
@@ -521,8 +622,6 @@ public class FlipView extends FrameLayout {
 								true, 0, FLIP_DISTANCE_PER_PAGE);
 					}
 				}
-
-				invalidate();
 			}
 			break;
 		case MotionEvent.ACTION_UP:
@@ -579,45 +678,62 @@ public class FlipView extends FrameLayout {
 			return;
 		}
 
-		boolean needsInvalidate = false;
-
 		if (!mScroller.isFinished() && mScroller.computeScrollOffset()) {
-			mFlipDistance = mScroller.getCurrY();
-			needsInvalidate = true;
+			setFlipDistance(mScroller.getCurrY());
 		}
 
 		if (mIsFlipping || !mScroller.isFinished() || mPeakAnim != null) {
+			showAllPages();
 			drawPreviousHalf(canvas);
 			drawNextHalf(canvas);
 			drawFlippingHalf(canvas);
 		} else {
 			endScroll();
-			final int currentPage = getCurrentPageFloor();
-			if (mCurrentPage != currentPage) {
-				postRemoveView(getChildAt(0));
-			}
-			final View v = viewForPage(currentPage);
-			if (mCurrentPage != currentPage) {
-				postAddView(v);
-				postFlippedToPage(currentPage);
-				mCurrentPage = currentPage;
-				mCurrentPageId = mAdapter.getItemId(mCurrentPage);
-			}
-			setDrawWithLayer(v, false);
+			setDrawWithLayer(mCurrentPage.v, false);
+			hideOtherPages(mCurrentPage);
+			drawChild(canvas, mCurrentPage.v, 0);
 
-			// TODO use drawChild() instead
-			v.draw(canvas);
+			// dispatch listener event now that we have "landed" on a page.
+			// TODO not the prettiest to have this with the drawing logic,
+			// should change.
+			if (mLastDispatchedPageEventIndex != mCurrentPageIndex) {
+				mLastDispatchedPageEventIndex = mCurrentPageIndex;
+				postFlippedToPage(mCurrentPageIndex);
+			}
 		}
 
 		// if overflip is GLOW mode and the edge effects needed drawing, make
 		// sure to invalidate
-		needsInvalidate |= mOverFlipper.draw(canvas);
-
-		if (needsInvalidate) {
+		if (mOverFlipper.draw(canvas)) {
 			// always invalidate whole screen as it is needed 99% of the time.
 			// This is because of the shadows and shines put on the non-flipping
 			// pages
 			invalidate();
+		}
+	}
+
+	private void hideOtherPages(Page p) {
+		if (mPreviousPage != p && mPreviousPage.valid && mPreviousPage.v.getVisibility() != GONE) {
+			mPreviousPage.v.setVisibility(GONE);
+		}
+		if (mCurrentPage != p && mCurrentPage.valid && mCurrentPage.v.getVisibility() != GONE) {
+			mCurrentPage.v.setVisibility(GONE);
+		}
+		if (mNextPage != p && mNextPage.valid && mNextPage.v.getVisibility() != GONE) {
+			mNextPage.v.setVisibility(GONE);
+		}
+		p.v.setVisibility(VISIBLE);
+	}
+
+	private void showAllPages() {
+		if (mPreviousPage.valid && mPreviousPage.v.getVisibility() != VISIBLE) {
+			mPreviousPage.v.setVisibility(VISIBLE);
+		}
+		if (mCurrentPage.valid && mCurrentPage.v.getVisibility() != VISIBLE) {
+			mCurrentPage.v.setVisibility(VISIBLE);
+		}
+		if (mNextPage.valid && mNextPage.v.getVisibility() != VISIBLE) {
+			mNextPage.v.setVisibility(VISIBLE);
 		}
 	}
 
@@ -627,17 +743,16 @@ public class FlipView extends FrameLayout {
 	 * @param canvas
 	 */
 	private void drawPreviousHalf(Canvas canvas) {
-		final View v = viewForPage(getCurrentPageFloor());
-
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
 
-		// if the view does not exist, skip drawing it
-		if (v != null) {
-			setDrawWithLayer(v, true);
+		final float degreesFlipped = getDegreesFlipped();
+		final Page p = degreesFlipped > 90 ? mPreviousPage : mCurrentPage;
 
-			// TODO use drawChild() instead
-			v.draw(canvas);
+		// if the view does not exist, skip drawing it
+		if (p.valid) {
+			setDrawWithLayer(p.v, true);
+			drawChild(canvas, p.v, 0);
 		}
 
 		drawPreviousShadow(canvas);
@@ -664,17 +779,16 @@ public class FlipView extends FrameLayout {
 	 * @param canvas
 	 */
 	private void drawNextHalf(Canvas canvas) {
-		final View v = viewForPage(getCurrentPageCeil());
-
 		canvas.save();
 		canvas.clipRect(isFlippingVertically() ? mBottomRect : mRightRect);
+		
+		final float degreesFlipped = getDegreesFlipped();
+		final Page p = degreesFlipped > 90 ? mCurrentPage : mNextPage;
 
 		// if the view does not exist, skip drawing it
-		if (v != null) {
-			setDrawWithLayer(v, true);
-
-			// TODO use drawChild() instead
-			v.draw(canvas);
+		if (p.valid) {
+			setDrawWithLayer(p.v, true);
+			drawChild(canvas, p.v, 0);
 		}
 
 		drawNextShadow(canvas);
@@ -696,12 +810,10 @@ public class FlipView extends FrameLayout {
 	}
 
 	private void drawFlippingHalf(Canvas canvas) {
-		final View v = viewForPage(getCurrentPageRound());
-
-		setDrawWithLayer(v, true);
-		final float degreesFlipped = getDegreesFlipped();
 		canvas.save();
 		mCamera.save();
+		
+		final float degreesFlipped = getDegreesFlipped();
 
 		if (degreesFlipped > 90) {
 			canvas.clipRect(isFlippingVertically() ? mTopRect : mLeftRect);
@@ -724,8 +836,8 @@ public class FlipView extends FrameLayout {
 		positionMatrix();
 		canvas.concat(mMatrix);
 
-		// TODO use drawChild() instead
-		v.draw(canvas);
+		setDrawWithLayer(mCurrentPage.v, true);
+		drawChild(canvas, mCurrentPage.v, 0);
 
 		drawFlippingShadeShine(canvas);
 
@@ -761,10 +873,12 @@ public class FlipView extends FrameLayout {
 	 * @param drawWithLayer
 	 */
 	private void setDrawWithLayer(View v, boolean drawWithLayer) {
-		if (v.getLayerType() != LAYER_TYPE_HARDWARE && drawWithLayer) {
-			v.setLayerType(LAYER_TYPE_HARDWARE, null);
-		} else if (v.getLayerType() != LAYER_TYPE_NONE && !drawWithLayer) {
-			v.setLayerType(LAYER_TYPE_NONE, null);
+		if (isHardwareAccelerated()) {
+			if (v.getLayerType() != LAYER_TYPE_HARDWARE && drawWithLayer) {
+				v.setLayerType(LAYER_TYPE_HARDWARE, null);
+			} else if (v.getLayerType() != LAYER_TYPE_NONE && !drawWithLayer) {
+				v.setLayerType(LAYER_TYPE_NONE, null);
+			}
 		}
 	}
 
@@ -778,99 +892,12 @@ public class FlipView extends FrameLayout {
 	private float getDegreesFlipped() {
 		float localFlipDistance = mFlipDistance % FLIP_DISTANCE_PER_PAGE;
 
-		// fix for negative modulo. always want a positve flip degree
+		// fix for negative modulo. always want a positive flip degree
 		if (localFlipDistance < 0) {
 			localFlipDistance += FLIP_DISTANCE_PER_PAGE;
 		}
 
 		return (localFlipDistance / FLIP_DISTANCE_PER_PAGE) * 180;
-	}
-
-	private View viewForPage(int page) {
-
-		// if the requested page is outside of the adapters scope, return null.
-		// This should only happen when over flipping with mode RUBBER_BAND
-		if (page < 0 || page >= mPageCount) {
-			return null;
-		}
-
-		final int viewType = mAdapter.getItemViewType(page);
-
-		// check if view needed is in active views, if so order to front and
-		// return this view
-		View v = getActiveView(page);
-		if (v != null) {
-			return v;
-		}
-
-		// get(and remove) a convertview with correct viewtype from recycled
-		// views
-		v = mRecycler.getScrapView(page, viewType);
-
-		// pass that view (can be null) into adapter to fill the view
-		v = mAdapter.getView(page, v, this);
-
-		// insert that view into active views pushing the least used active view
-		// into recycled views
-		addToActiveView(v, page, viewType);
-
-		// measure and layout view
-		measureAndLayoutChild(v);
-
-		// return view
-		return v;
-	}
-
-	private void measureAndLayoutChild(View v) {
-		int childWidthMeasureSpec = MeasureSpec.makeMeasureSpec(getWidth(),
-				MeasureSpec.EXACTLY);
-		int childHeightMeasureSpec = MeasureSpec.makeMeasureSpec(getHeight(),
-				MeasureSpec.EXACTLY);
-		measureChild(v, childWidthMeasureSpec, childHeightMeasureSpec);
-		layoutChild(v);
-	}
-
-	private void addToActiveView(View v, int page, int viewType) {
-		mActivePageQueue.add(new Page(page, v));
-		if (mActivePageQueue.size() > 3) {
-			final View view = mActivePageQueue.remove().view;
-			mRecycler.addScrapView(view, page, viewType);
-		}
-	}
-
-	private View getActiveView(int position) {
-		Page page = null;
-		for (Page p : mActivePageQueue) {
-			if (p.position == position) {
-				page = p;
-			}
-		}
-		if (page != null) {
-			mActivePageQueue.remove(page);
-			mActivePageQueue.add(page);
-			return page.view;
-		}
-		return null;
-	}
-
-	private void postAddView(final View v) {
-		post(new Runnable() {
-
-			@Override
-			public void run() {
-				addView(v);
-			}
-		});
-	}
-
-	private void postRemoveView(final View v) {
-		post(new Runnable() {
-
-			@Override
-			public void run() {
-				removeView(v);
-			}
-		});
 	}
 
 	private void postFlippedToPage(final int page) {
@@ -986,7 +1013,8 @@ public class FlipView extends FrameLayout {
 	}
 
 	private void peak(boolean next, boolean once) {
-		final float baseFlipDistance = mCurrentPage * FLIP_DISTANCE_PER_PAGE;
+		final float baseFlipDistance = mCurrentPageIndex
+				* FLIP_DISTANCE_PER_PAGE;
 		if (next) {
 			mPeakAnim = ValueAnimator.ofFloat(baseFlipDistance,
 					baseFlipDistance + FLIP_DISTANCE_PER_PAGE / 4);
@@ -999,8 +1027,7 @@ public class FlipView extends FrameLayout {
 
 			@Override
 			public void onAnimationUpdate(ValueAnimator animation) {
-				mFlipDistance = (Float) animation.getAnimatedValue();
-				invalidate();
+				setFlipDistance((Float) animation.getAnimatedValue());
 			}
 		});
 		mPeakAnim.addListener(new AnimatorListenerAdapter() {
@@ -1057,27 +1084,22 @@ public class FlipView extends FrameLayout {
 
 		// remove all the current views
 		removeAllViews();
-		mActivePageQueue.clear();
 
 		mAdapter = adapter;
 		mPageCount = adapter == null ? 0 : mAdapter.getCount();
 
-		// put the current page within the new adapter range
-		mCurrentPage = Math.min(mPageCount - 1,
-				mCurrentPage == INVALID_PAGE_POSITION ? 0 : mCurrentPage);
-
 		if (adapter != null) {
 			mAdapter.registerDataSetObserver(dataSetObserver);
+
+			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
+			mRecycler.invalidateScraps();
 		}
 
-		if (mCurrentPage != INVALID_PAGE_POSITION) {
-			mRecycler.setViewTypeCount(mAdapter.getViewTypeCount());
-			mCurrentPageId = mAdapter.getItemId(mCurrentPage);
-			addView(viewForPage(mCurrentPage));
-		} else {
-			mPageCount = 0;
-			mFlipDistance = 0;
-		}
+		// TODO pretty confusing
+		// this will be correctly set in setFlipDistance method
+		mCurrentPageIndex = INVALID_PAGE_POSITION;
+		mFlipDistance = INVALID_FLIP_DISTANCE;
+		setFlipDistance(0);
 
 		updateEmptyStatus();
 	}
@@ -1091,7 +1113,7 @@ public class FlipView extends FrameLayout {
 	}
 
 	public int getCurrentPage() {
-		return mCurrentPage;
+		return mCurrentPageIndex;
 	}
 
 	public void flipTo(int page) {
@@ -1099,12 +1121,11 @@ public class FlipView extends FrameLayout {
 			throw new IllegalArgumentException("That page does not exist");
 		}
 		endFlip();
-		mFlipDistance = page * FLIP_DISTANCE_PER_PAGE;
-		invalidate();
+		setFlipDistance(page * FLIP_DISTANCE_PER_PAGE);
 	}
 
 	public void flipBy(int delta) {
-		flipTo(mCurrentPage + delta);
+		flipTo(mCurrentPageIndex + delta);
 	}
 
 	public void smoothFlipTo(int page) {
@@ -1120,7 +1141,7 @@ public class FlipView extends FrameLayout {
 	}
 
 	public void smoothFlipBy(int delta) {
-		smoothFlipTo(mCurrentPage + delta);
+		smoothFlipTo(mCurrentPageIndex + delta);
 	}
 
 	/**
@@ -1131,7 +1152,7 @@ public class FlipView extends FrameLayout {
 	 *            view
 	 */
 	public void peakNext(boolean once) {
-		if (mCurrentPage < mPageCount - 1) {
+		if (mCurrentPageIndex < mPageCount - 1) {
 			peak(true, once);
 		}
 	}
@@ -1145,7 +1166,7 @@ public class FlipView extends FrameLayout {
 	 *            view
 	 */
 	public void peakPrevious(boolean once) {
-		if (mCurrentPage > 0) {
+		if (mCurrentPageIndex > 0) {
 			peak(false, once);
 		}
 	}
