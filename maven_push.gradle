@@ -18,7 +18,7 @@ afterEvaluate { project ->
                 pom.artifactId = POM_ARTIFACT_ID
 
                 repository(url: sonatypeRepositoryUrl) {
-                    authentication(userName: SONATYPE_USERNAME, password: SONATYPE_PASSWORD)
+//                    authentication(userName: SONATYPE_USERNAME, password: SONATYPE_PASSWORD)
                 }
 
                 pom.project {
@@ -58,7 +58,8 @@ afterEvaluate { project ->
     }
 
     task androidJavadocs(type: Javadoc) {
-        source = android.sourceSets.main.allJava
+        failOnError false
+        source = android.sourceSets.main.java
     }
 
     task androidJavadocsJar(type: Jar) {
@@ -70,7 +71,7 @@ afterEvaluate { project ->
     task androidSourcesJar(type: Jar) {
         classifier = 'sources'
         //basename = artifact_id
-        from android.sourceSets.main.allSource
+        from android.sourceSets.main.java
     }
 
     artifacts {
