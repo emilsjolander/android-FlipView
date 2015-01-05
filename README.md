@@ -5,7 +5,7 @@ About
 -----
 This library is made to be very easy to use and at the same time be feature complete.
 With only a few lines of code you can have a flipping animation between your views, 
-this looks and acts very much like the Flipboard application (I am however not affiliated with them in any way).
+this looks and acts very much like the Flipboard application.
 
 All flipping animations should be very smooth and i have added lighting effects so the flipping look more realistic.
 
