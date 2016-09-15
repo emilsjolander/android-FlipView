@@ -56,26 +56,4 @@ afterEvaluate { project ->
         required { isReleaseBuild() && gradle.taskGraph.hasTask("uploadArchives") }
         sign configurations.archives
     }
-
-    task androidJavadocs(type: Javadoc) {
-        source = android.sourceSets.main.allJava
-    }
-
-    task androidJavadocsJar(type: Jar) {
-        classifier = 'javadoc'
-        //basename = artifact_id
-        from androidJavadocs.destinationDir
-    }
-
-    task androidSourcesJar(type: Jar) {
-        classifier = 'sources'
-        //basename = artifact_id
-        from android.sourceSets.main.allSource
-    }
-
-    artifacts {
-        //archives packageReleaseJar
-        archives androidSourcesJar
-        archives androidJavadocsJar
-    }
 }
