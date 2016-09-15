@@ -2,10 +2,7 @@
 <resources>
     
     <declare-styleable name="FlipView">
-        <attr name="orientation" format="enum">
-            <enum name="vertical" value="0"/>
-            <enum name="horizontal" value="1"/>
-        </attr>
+        <attr name="android:orientation" />
         <attr name="overFlipMode" format="enum">
             <enum name="glow" value="0"/>
             <enum name="rubber_band" value="1"/>
