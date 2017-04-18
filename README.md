@@ -16,7 +16,7 @@ https://www.dropbox.com/s/tvmdhre4ra8l41p/sample-debug-unaligned.apk
 
 Installing
 ---------------
-###Gradle
+### Gradle
 Add the following gradle dependency exchanging `x.x.x` for the latest release.
 ```groovy
 dependencies {
